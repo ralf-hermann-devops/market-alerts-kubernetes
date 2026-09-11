@@ -5,7 +5,7 @@ from pathlib import Path
 import time
 
 
-API_DIR = Path(__file__).resolve().parent
+API_DIR = Path(__file__).resolve().parents[1]
 IMAGE_NAME = "app-api-local_api-smoketest"
 CONTAINER_NAME = "api-local_api-smoketest"
 REDIS_NAME = "redis-local_api-smoketest"
