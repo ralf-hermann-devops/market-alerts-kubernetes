@@ -139,6 +139,8 @@ def test_endpoints():
 
 
 def summarize_results(results):
+    if results is None:
+        return ["failed: All smoke tests, Got no results to summarize."]
     checks = [
         ("Healthz", results["healthz"], '{"ok":true}'),
         ("Readyz", results["readyz"], '{"ready":true}'),
@@ -162,17 +164,17 @@ def cleanup():
 
 
 if __name__ == "__main__":
+    results = None
     try:
         ensure_network()
         ensure_redis()
         build_image()
         start_api()
-        time.sleep(10)  # wait for the API to start
+        time.sleep(5)  # wait for the API to start
         results = test_endpoints()
-        print("\nProcessed results:")
-        print(results)
+    finally:
+        cleanup()
+        
         print("\nSummary:")
         for line in summarize_results(results):
             print(line)
-    finally:
-        cleanup()

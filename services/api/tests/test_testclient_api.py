@@ -25,8 +25,7 @@ def make_client(monkeypatch):
         classmethod(lambda cls, *args, **kwargs: FakeRedis()),
     )
 
-    import api
-
+    api = importlib.import_module("app.main")
     importlib.reload(api)
     return TestClient(api.app)
 
