@@ -11,7 +11,7 @@ CONTAINER_NAME = "api-local_api-smoketest"
 REDIS_NAME = "redis-local_api-smoketest"
 BUSYBOX_NAME = "api-smoke-busybox_api-smoketest"
 NETWORK_NAME = "api-local-net_api-smoketest"
-
+WEBHOOK_SECRET = "dev-secret" 
 
 def run(cmd, check=True, cwd=None):
     print("$", " ".join(cmd))
@@ -79,7 +79,7 @@ def start_api():
         "-p", "8000:8000",
         "-e", f"REDIS_URL=redis://{REDIS_NAME}:6379/0",
         "-e", "DATABASE_URL=postgresql://app:app@host.docker.internal:5432/alerts",
-        "-e", "WEBHOOK_SECRET=dev-secret",
+        "-e", f"WEBHOOK_SECRET={WEBHOOK_SECRET}",
         IMAGE_NAME,
     ])
 
@@ -122,11 +122,11 @@ def test_endpoints():
     print(readyz_result)
 
     print("\nPosting valid webhook via busybox")
-    valid_webhook_result = send_webhook("dev-secret")
+    valid_webhook_result = send_webhook(WEBHOOK_SECRET)
     print(valid_webhook_result)
 
     print("\nPosting invalid webhook via busybox")
-    invalid_webhook_result = send_webhook("wrong-secret")
+    invalid_webhook_result = send_webhook(WEBHOOK_SECRET + "ttttttt_010101")
     print(invalid_webhook_result)
 
     results = {
