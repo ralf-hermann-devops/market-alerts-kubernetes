@@ -1,0 +1,25 @@
+x-common-env: &common-env
+  REDIS_URL: redis://redis:6379/0
+  DATABASE_URL: postgresql://app:app@postgres:5432/alerts
+  WEBHOOK_SECRET: dev-secret
+  REDIS_STREAM: alerts
+
+services:
+  api:
+    build: ./services/api
+    ports: ["8000:8000"]
+    environment:
+      <<: *common-env
+    depends_on: [redis]
+  worker:
+    build: ./services/worker
+    environment:
+      <<: *common-env
+      REDIS_GROUP: workers
+    depends_on: [redis, postgres]
+  redis:
+    image: redis:7-alpine
+  postgres:
+    image: postgres:16-alpine
+    environment: { POSTGRES_USER: app, POSTGRES_PASSWORD: app, POSTGRES_DB: alerts }
+    volumes: ["./services/db/init.sql:/docker-entrypoint-initdb.d/init.sql"]

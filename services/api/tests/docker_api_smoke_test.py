@@ -1,11 +1,15 @@
 import json
+import os
 import shlex
 import subprocess
 from pathlib import Path
 import time
 
 
-API_DIR = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
+API_DIR = ROOT / "services" / "api"
+COMPOSE_FILE = ROOT / "Dockercompose.yaml"
+COMPOSE_PROJECT = f"api-smoke-{os.getpid()}"
 IMAGE_NAME = "app-api-local_api-smoketest"
 CONTAINER_NAME = "api-local_api-smoketest"
 REDIS_NAME = "redis-local_api-smoketest"
@@ -55,15 +59,27 @@ def ensure_network():
 
 
 def ensure_redis():
-    result = run(["docker", "ps", "-a", "--filter", f"name=^{REDIS_NAME}$", "--format", "{{.Names}}"], check=False)
-    if result.stdout.strip() != REDIS_NAME:
-        run([
-            "docker", "run", "-d",
-            "--name", REDIS_NAME,
-            "--network", NETWORK_NAME,
-            "-p", "6379:6379",
-            "redis:7-alpine",
-        ])
+    run([
+        "docker", "compose",
+        "-f", str(COMPOSE_FILE),
+        "-p", COMPOSE_PROJECT,
+        "up", "-d", "redis",
+    ])
+    result = run([
+        "docker", "compose",
+        "-f", str(COMPOSE_FILE),
+        "-p", COMPOSE_PROJECT,
+        "ps", "-q", "redis",
+    ])
+    container_id = result.stdout.strip()
+    if not container_id:
+        raise RuntimeError("Docker Compose did not return a Redis container ID")
+    run([
+        "docker", "network", "connect",
+        "--alias", REDIS_NAME,
+        NETWORK_NAME,
+        container_id,
+    ])
 
 
 def build_image():
@@ -76,7 +92,6 @@ def start_api():
         "docker", "run", "-d",
         "--name", CONTAINER_NAME,
         "--network", NETWORK_NAME,
-        "-p", "8000:8000",
         "-e", f"REDIS_URL=redis://{REDIS_NAME}:6379/0",
         "-e", "DATABASE_URL=postgresql://app:app@host.docker.internal:5432/alerts",
         "-e", f"WEBHOOK_SECRET={WEBHOOK_SECRET}",
@@ -158,8 +173,13 @@ def summarize_results(results):
 
 def cleanup():
     run(["docker", "rm", "-f", CONTAINER_NAME], check=False)
-    run(["docker", "rm", "-f", REDIS_NAME], check=False)
     run(["docker", "rm", "-f", BUSYBOX_NAME], check=False)
+    run([
+        "docker", "compose",
+        "-f", str(COMPOSE_FILE),
+        "-p", COMPOSE_PROJECT,
+        "down", "--volumes", "--remove-orphans",
+    ], check=False)
     run(["docker", "network", "rm", NETWORK_NAME], check=False)
 
 
