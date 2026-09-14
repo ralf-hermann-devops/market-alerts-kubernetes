@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 app = FastAPI()
 r = redis.Redis.from_url(os.environ["REDIS_URL"], decode_responses=True)
+stream_name = os.getenv("REDIS_STREAM", "alerts")
 
 class Alert(BaseModel):
     secret: str          # TradingView can't send custom headers, so put it in the JSON body
@@ -17,7 +18,7 @@ class Alert(BaseModel):
 def webhook(alert: Alert):
     if alert.secret != os.environ["WEBHOOK_SECRET"]:
         raise HTTPException(401)
-    r.xadd("alerts", {"payload": alert.model_dump_json(exclude={"secret"})},
+    r.xadd(stream_name, {"payload": alert.model_dump_json(exclude={"secret"})},
            maxlen=100_000, approximate=True)
     return {"status": "queued"}
 
