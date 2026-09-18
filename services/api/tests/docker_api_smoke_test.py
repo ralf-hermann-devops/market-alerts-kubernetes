@@ -7,15 +7,9 @@ import time
 
 
 ROOT = Path(__file__).resolve().parents[3]
-API_DIR = ROOT / "services" / "api"
 COMPOSE_FILE = ROOT / "Dockercompose.yaml"
 COMPOSE_PROJECT = f"api-smoke-{os.getpid()}"
-IMAGE_NAME = "app-api-local_api-smoketest"
 CONTAINER_NAME = "api-local_api-smoketest"
-REDIS_NAME = "redis-local_api-smoketest"
-BUSYBOX_NAME = "api-smoke-busybox_api-smoketest"
-NETWORK_NAME = "api-local-net_api-smoketest"
-WEBHOOK_SECRET = "dev-secret" 
 
 def run(cmd, check=True, cwd=None):
     print("$", " ".join(cmd))
@@ -25,24 +19,28 @@ def run(cmd, check=True, cwd=None):
     return result
 
 
+def compose(*args, check=True):
+    return run([
+        "docker", "compose",
+        "-f", str(COMPOSE_FILE),
+        "-p", COMPOSE_PROJECT,
+        *args,
+    ], check=check)
+
+
+def compose_service_environment(service):
+    result = compose("config", "--format", "json")
+    compose_config = json.loads(result.stdout)
+    return compose_config["services"][service].get("environment", {})
+
+
 def request_http(path, timeout=30):
     deadline = time.time() + timeout
     last_output = ""
 
     while time.time() < deadline:
-        container_name_busy_box = f"api-check-{path.strip('/').replace('/', '-') or 'root'}"
-        run(["docker", "rm", "-f", container_name_busy_box], check=False)
-        cmd = (
-            f"wget -T 5 -q -O - http://{CONTAINER_NAME}:8000{path} 2>&1"
-        )
-        result = run([
-            "docker", "run", "--rm",
-            "--network", NETWORK_NAME,
-            "--name", container_name_busy_box,
-            "busybox:1.36",
-            "sh", "-c",
-            cmd,
-        ], check=False)
+        cmd = f"wget -T 5 -q -O - http://api:8000{path} 2>&1"
+        result = compose("run", "--rm", "--no-deps", "smoke-client", cmd, check=False)
         combined = (result.stdout + result.stderr).strip()
         if result.returncode == 0 and combined:
             return combined
@@ -52,51 +50,16 @@ def request_http(path, timeout=30):
     return last_output
 
 
-def ensure_network():
-    result = run(["docker", "network", "inspect", NETWORK_NAME], check=False)
-    if result.returncode != 0:
-        run(["docker", "network", "create", NETWORK_NAME])
-
-
 def ensure_redis():
-    run([
-        "docker", "compose",
-        "-f", str(COMPOSE_FILE),
-        "-p", COMPOSE_PROJECT,
-        "up", "-d", "redis",
-    ])
-    result = run([
-        "docker", "compose",
-        "-f", str(COMPOSE_FILE),
-        "-p", COMPOSE_PROJECT,
-        "ps", "-q", "redis",
-    ])
-    container_id = result.stdout.strip()
-    if not container_id:
-        raise RuntimeError("Docker Compose did not return a Redis container ID")
-    run([
-        "docker", "network", "connect",
-        "--alias", REDIS_NAME,
-        NETWORK_NAME,
-        container_id,
-    ])
+    compose("up", "-d", "redis")
 
 
 def build_image():
-    run(["docker", "build", "-t", IMAGE_NAME, "."], cwd=str(API_DIR))
+    compose("build", "api")
 
 
 def start_api():
-    run(["docker", "rm", "-f", CONTAINER_NAME], check=False)
-    run([
-        "docker", "run", "-d",
-        "--name", CONTAINER_NAME,
-        "--network", NETWORK_NAME,
-        "-e", f"REDIS_URL=redis://{REDIS_NAME}:6379/0",
-        "-e", "DATABASE_URL=postgresql://app:app@host.docker.internal:5432/alerts",
-        "-e", f"WEBHOOK_SECRET={WEBHOOK_SECRET}",
-        IMAGE_NAME,
-    ])
+    compose("run", "-d", "--no-deps", "--use-aliases", "--name", CONTAINER_NAME, "api")
 
 
 def send_webhook(secret, symbol="AAPL", action="long", price=123.45, timeframe="1h"):
@@ -109,17 +72,12 @@ def send_webhook(secret, symbol="AAPL", action="long", price=123.45, timeframe="
     }, separators=(",", ":"))
     payload_arg = shlex.quote(payload)
 
-    run([
-        "docker", "rm", "-f", BUSYBOX_NAME,
-    ], check=False)
-    result = run([
-        "docker", "run", "--rm",
-        "--network", NETWORK_NAME,
-        "--name", BUSYBOX_NAME,
-        "busybox:1.36",
-        "sh", "-c",
-        f"wget -S -O - --header='Content-Type: application/json' --post-data={payload_arg} http://{CONTAINER_NAME}:8000/webhook/tradingview",
-    ], check=False)
+    result = compose(
+        "run", "--rm", "--no-deps", "smoke-client",
+        f"wget -S -O - --header='Content-Type: application/json' "
+        f"--post-data={payload_arg} http://api:8000/webhook/tradingview",
+        check=False,
+    )
     output = (result.stdout or result.stderr).strip()
     return {
         "status_code": result.returncode,
@@ -127,7 +85,7 @@ def send_webhook(secret, symbol="AAPL", action="long", price=123.45, timeframe="
     }
 
 
-def test_endpoints():
+def test_endpoints(webhook_secret):
     print("\nChecking /healthz")
     healthz_result = request_http("/healthz")
     print(healthz_result)
@@ -137,11 +95,11 @@ def test_endpoints():
     print(readyz_result)
 
     print("\nPosting valid webhook via busybox")
-    valid_webhook_result = send_webhook(WEBHOOK_SECRET)
+    valid_webhook_result = send_webhook(webhook_secret)
     print(valid_webhook_result)
 
     print("\nPosting invalid webhook via busybox")
-    invalid_webhook_result = send_webhook(WEBHOOK_SECRET + "ttttttt_010101")
+    invalid_webhook_result = send_webhook(webhook_secret + "ttttttt_010101")
     print(invalid_webhook_result)
 
     results = {
@@ -172,26 +130,18 @@ def summarize_results(results):
 
 
 def cleanup():
-    run(["docker", "rm", "-f", CONTAINER_NAME], check=False)
-    run(["docker", "rm", "-f", BUSYBOX_NAME], check=False)
-    run([
-        "docker", "compose",
-        "-f", str(COMPOSE_FILE),
-        "-p", COMPOSE_PROJECT,
-        "down", "--volumes", "--remove-orphans",
-    ], check=False)
-    run(["docker", "network", "rm", NETWORK_NAME], check=False)
+    compose("down", "--volumes", "--remove-orphans", check=False)
 
 
 if __name__ == "__main__":
     results = None
     try:
-        ensure_network()
+        api_environment = compose_service_environment("api")
         ensure_redis()
         build_image()
         start_api()
         time.sleep(5)  # wait for the API to start
-        results = test_endpoints()
+        results = test_endpoints(api_environment["WEBHOOK_SECRET"])
     finally:
         cleanup()
         

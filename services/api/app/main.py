@@ -4,7 +4,13 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 app = FastAPI()
-r = redis.Redis.from_url(os.environ["REDIS_URL"], decode_responses=True)
+r = redis.Redis(
+    host=os.environ["REDIS_HOST"],
+    port=int(os.environ["REDIS_PORT"]),
+    db=int(os.environ["REDIS_DB"]),
+    password=os.environ["REDIS_PASSWORD"],
+    decode_responses=True,
+)
 stream_name = os.getenv("REDIS_STREAM", "alerts")
 
 class Alert(BaseModel):
