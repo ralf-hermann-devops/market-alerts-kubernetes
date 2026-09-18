@@ -9,7 +9,10 @@ from fastapi.testclient import TestClient
 
 
 def make_client(monkeypatch):
-    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("REDIS_HOST", "localhost")
+    monkeypatch.setenv("REDIS_PORT", "6379")
+    monkeypatch.setenv("REDIS_DB", "0")
+    monkeypatch.setenv("REDIS_PASSWORD", "test-password")
     monkeypatch.setenv("WEBHOOK_SECRET", "dev-secret")
 
     class FakeRedis:
@@ -20,9 +23,9 @@ def make_client(monkeypatch):
             return True
 
     monkeypatch.setattr(
-        redis.Redis,
-        "from_url",
-        classmethod(lambda cls, *args, **kwargs: FakeRedis()),
+        redis,
+        "Redis",
+        lambda **kwargs: FakeRedis(),
     )
 
     api = importlib.import_module("app.main")
