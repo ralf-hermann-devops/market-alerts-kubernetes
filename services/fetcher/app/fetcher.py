@@ -2,19 +2,9 @@
 import datetime
 from decimal import Decimal
 import os, sys, psycopg
-from urllib.parse import quote
 import yfinance as yf
 
 SYMBOLS = os.environ["SYMBOLS"].split(",")          # from ConfigMap
-
-
-def database_url() -> str:
-    user = quote(os.environ["POSTGRES_USER"], safe="")
-    password = quote(os.environ["POSTGRES_PASSWORD"], safe="")
-    host = os.environ["POSTGRES_HOST"]
-    port = os.environ["POSTGRES_PORT"]
-    database = quote(os.environ["POSTGRES_DB"], safe="")
-    return f"postgresql://{user}:{password}@{host}:{port}/{database}"
 
 
 def fetch_candles(symbol: str) -> list[tuple[datetime.datetime, Decimal, Decimal, Decimal, Decimal, int]]:
@@ -40,7 +30,13 @@ def fetch_candles(symbol: str) -> list[tuple[datetime.datetime, Decimal, Decimal
 
 
 def main():
-    with psycopg.connect(database_url()) as db:
+    with psycopg.connect(
+        dbname=os.environ["POSTGRES_DB"],
+        user=os.environ["POSTGRES_USER"],
+        password=os.environ["POSTGRES_PASSWORD"],
+        host=os.environ["POSTGRES_HOST"],
+        port=os.environ["POSTGRES_PORT"],
+    ) as db:
         for s in SYMBOLS:
             for c in fetch_candles(s):
                 db.execute(

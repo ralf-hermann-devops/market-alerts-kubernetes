@@ -4,19 +4,9 @@ import os
 import signal
 import socket
 from typing import Any, cast
-from urllib.parse import quote
 
 import psycopg
 import redis
-
-
-def database_url() -> str:
-    user = quote(os.environ["POSTGRES_USER"], safe="")
-    password = quote(os.environ["POSTGRES_PASSWORD"], safe="")
-    host = os.environ["POSTGRES_HOST"]
-    port = os.environ["POSTGRES_PORT"]
-    database = quote(os.environ["POSTGRES_DB"], safe="")
-    return f"postgresql://{user}:{password}@{host}:{port}/{database}"
 
 
 running = True
@@ -36,7 +26,13 @@ try:
     r.xgroup_create(stream_name, group, id="0", mkstream=True)
 except redis.ResponseError: pass                     # group exists
 
-with psycopg.connect(database_url()) as db:
+with psycopg.connect(
+    dbname=os.environ["POSTGRES_DB"],
+    user=os.environ["POSTGRES_USER"],
+    password=os.environ["POSTGRES_PASSWORD"],
+    host=os.environ["POSTGRES_HOST"],
+    port=os.environ["POSTGRES_PORT"],
+) as db:
     while running:
         stream_messages = cast(list[Any], r.xreadgroup(group, consumer, {stream_name: ">"}, count=10, block=5000) or [])
         for _, msgs in stream_messages:
