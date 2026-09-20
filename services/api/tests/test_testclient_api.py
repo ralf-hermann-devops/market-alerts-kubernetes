@@ -40,7 +40,8 @@ def test_healthz(monkeypatch):
     assert response.json() == {"ok": True}
 
 
-def test_webhook_accepts_valid_alert(monkeypatch):
+def test_webhook_accepts_valid_alert(monkeypatch, caplog):
+    caplog.set_level("INFO", logger="app.main")
     client = make_client(monkeypatch)
     response = client.post(
         "/webhook/tradingview",
@@ -54,9 +55,12 @@ def test_webhook_accepts_valid_alert(monkeypatch):
     )
     assert response.status_code == 202
     assert response.json() == {"status": "queued"}
+    assert "Queued webhook" in caplog.text
+    assert "dev-secret" not in caplog.text
 
 
-def test_webhook_rejects_invalid_secret(monkeypatch):
+def test_webhook_rejects_invalid_secret(monkeypatch, caplog):
+    caplog.set_level("INFO", logger="app.main")
     client = make_client(monkeypatch)
     response = client.post(
         "/webhook/tradingview",
@@ -67,3 +71,5 @@ def test_webhook_rejects_invalid_secret(monkeypatch):
         },
     )
     assert response.status_code == 401
+    assert "Rejected webhook with invalid secret" in caplog.text
+    assert "wrong-secret" not in caplog.text

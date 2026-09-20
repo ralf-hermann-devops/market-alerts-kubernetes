@@ -9,7 +9,7 @@ SYMBOLS = os.environ["SYMBOLS"].split(",")          # from ConfigMap
 
 def fetch_candles(symbol: str) -> list[tuple[datetime.datetime, Decimal, Decimal, Decimal, Decimal, int]]:
     history = yf.Ticker(symbol).history(
-        period="1mo",
+        period="1d",
         interval="1m",
         auto_adjust=False,
     )
