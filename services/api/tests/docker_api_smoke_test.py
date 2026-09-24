@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shlex
 import subprocess
 from pathlib import Path
@@ -78,10 +79,11 @@ def send_webhook(secret, symbol="AAPL", action="long", price=123.45, timeframe="
         f"--post-data={payload_arg} http://api:8000/webhook/tradingview",
         check=False,
     )
-    output = (result.stdout or result.stderr).strip()
+    status_match = re.search(r"HTTP/\d+(?:\.\d+)?\s+(\d{3})", result.stderr)
     return {
-        "status_code": result.returncode,
-        "body": output,
+        "status_code": int(status_match.group(1)) if status_match else None,
+        "returncode": result.returncode,
+        "body": result.stdout.strip(),
     }
 
 
@@ -115,15 +117,18 @@ def summarize_results(results):
     if results is None:
         return ["failed: All smoke tests, Got no results to summarize."]
     checks = [
-        ("Healthz", results["healthz"], '{"ok":true}'),
-        ("Readyz", results["readyz"], '{"ready":true}'),
-        ("Valid Webhook", results["valid_webhook"]["body"], '{"status":"queued"}'),
-        ("Invalid Webhook", results["invalid_webhook"]["body"], '401 Unauthorized'),
+        ("Healthz", '{"ok":true}' in results["healthz"]),
+        ("Readyz", '{"ready":true}' in results["readyz"]),
+        (
+            "Valid Webhook",
+            results["valid_webhook"]["status_code"] == 202
+            and '{"status":"queued"}' in results["valid_webhook"]["body"],
+        ),
+        ("Invalid Webhook", results["invalid_webhook"]["status_code"] == 401),
     ]
 
     output = []
-    for label, actual, expected in checks:
-        passed = expected in actual if actual else False
+    for label, passed in checks:
         status = "passed" if passed else "failed"
         output.append(f"{status}: {label}-test")
     return output
