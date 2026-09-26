@@ -1,8 +1,6 @@
 # ADR 001: Redis over RabbitMQ
 
-Status: Draft
-
-## Problem
+## Context
 
 The API receives alerts via webhook and should not process them itself. I need a queue between the API and the worker for this.
 
