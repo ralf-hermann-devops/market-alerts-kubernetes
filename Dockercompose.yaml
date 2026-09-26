@@ -2,12 +2,12 @@ x-redis-env: &redis-env
   REDIS_HOST: redis
   REDIS_PORT: "6379"
   REDIS_DB: "0"
-  REDIS_PASSWORD: redis-dev-password
+  REDIS_PASSWORD: redis-dev-password  # throwaway password for temporary provisioning in local dev environment
   REDIS_STREAM: alerts
 
 x-postgres-env: &postgres-env
   POSTGRES_USER: app
-  POSTGRES_PASSWORD: password
+  POSTGRES_PASSWORD: password   # throwaway password for temporary provisioning in local dev environment
   POSTGRES_HOST: postgres
   POSTGRES_PORT: "5432"
   POSTGRES_DB: alerts

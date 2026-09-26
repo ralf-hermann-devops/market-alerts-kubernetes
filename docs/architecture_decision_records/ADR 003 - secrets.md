@@ -1,4 +1,4 @@
-# ADR 002: Sealed Secrets for Kubernetes Secrets
+# ADR 003: Sealed Secrets for Kubernetes Secrets
 
 ## Context
 
