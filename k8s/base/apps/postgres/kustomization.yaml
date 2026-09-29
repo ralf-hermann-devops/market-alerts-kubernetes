@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: trading-alerts
+
+resources:
+  - service.yaml
+  - statefulset.yaml
+
+configMapGenerator:
+  - name: postgres-init
+    files:
+      - init.sql
+
+generatorOptions:
+  disableNameSuffixHash: true
