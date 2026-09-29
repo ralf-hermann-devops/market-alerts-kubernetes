@@ -9,10 +9,18 @@ import tempfile
 from pathlib import Path
 
 
+"""
+Because secrets should not be stored in git, someone will have to pass the value for 
+passwords and other secrets to the cluster manually. The script will prompt for the
+secret values encoded in base64 and create a SealedSecret manifest that can be applied
+to the cluster and is safe to store in git. The SealedSecret can only be decrypted by
+the Sealed Secrets controller running in the target cluster.
+"""
+
 def main() -> int:
     script_path = Path(__file__).resolve()
-    repository_root = script_path.parents[3]
-    output_path = repository_root / "k8s" / "base" / "apps" / "trading-alerts-sealedsecret.yaml"
+    k8s_dir = script_path.parent
+    output_path = k8s_dir / "base" / "apps" / "trading-alerts-sealedsecret.yaml"
 
     for executable in ("kubectl", "kubeseal"):
         if shutil.which(executable) is None:
