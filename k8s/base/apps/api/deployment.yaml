@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   name: api
   namespace: trading-alerts
+  labels:
+    app: api
 spec:
   selector:
     matchLabels:
