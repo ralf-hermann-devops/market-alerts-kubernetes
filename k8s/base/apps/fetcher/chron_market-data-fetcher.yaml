@@ -1,0 +1,42 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: market-data-fetcher
+  namespace: trading-alerts
+spec:
+  schedule: "*/15 * * * 1-5"
+  timeZone: "America/New_York"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 300
+      ttlSecondsAfterFinished: 3600
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: fetcher
+              image: trading-fetcher:dev
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+
+              envFrom:
+                - configMapRef:
+                    name: app-config
+                - configMapRef:
+                    name: fetcher-config
+              env:
+                - name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: trading-alerts-secrets
+                      key: postgres-password

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fetcher-config
+  namespace: trading-alerts
+data:
+  SYMBOLS: AAPL
