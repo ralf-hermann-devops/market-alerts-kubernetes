@@ -42,13 +42,9 @@ These credentials are intentionally disposable and exist only to support local i
 
 ### Deployment in Kubernetes
 
-Create a secret locally and seal it with `kubeseal`:
+The `k8s/bootstrapping.py` script installs the Sealed Secrets controller and waits for it to become available, then runs `k8s/create_sealed_secret.py` to prompt for secret values and write the encrypted manifest at `k8s/base/apps/trading-alerts-sealedsecret.yaml`. The script requires `kubectl` connected to the target cluster and `kubeseal` on `PATH`.
 
-```bash
-kubectl create secret generic app-secrets \
-  --from-literal=POSTGRES_PASSWORD=... \
-  --dry-run=client -o yaml | kubeseal -o yaml > sealed-secret.yaml
-```
+The sealed manifest is applied with the selected Kustomize overlay. If it already exists, the generator asks before replacing it.
 
 ## Further Considerations
 

@@ -10,7 +10,7 @@ resources:
 configMapGenerator:
   - name: postgres-init
     files:
-      - init.sql
+      - init.sql  # use external sql file instead of inline sql for better editablility and version control
 
 generatorOptions:
   disableNameSuffixHash: true

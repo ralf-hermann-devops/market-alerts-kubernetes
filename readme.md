@@ -43,3 +43,11 @@ Set the `secret` to the same value as the API's `WEBHOOK_SECRET`. In TradingView
 ## Kubernetes
 
 The application is containerized and can also be deployed to a Kubernetes cluster. Kubernetes manifests are organized with Kustomize under `k8s/`, allowing shared configuration to be separated from environment-specific settings. A local cluster such as kind or Minikube can be used for testing, with cloud-specific configuration added when deploying to a platform such as Amazon EKS.
+
+To bootstrap a cluster, make sure `kubectl` is connected to the target cluster and both `kubectl` and `kubeseal` are available on `PATH`, then run:
+
+```bash
+python k8s/bootstrapping.py
+```
+
+The bootstrap script installs the Sealed Secrets controller, prompts for the application secret values, writes the encrypted SealedSecret manifest, and applies the selected overlay.
