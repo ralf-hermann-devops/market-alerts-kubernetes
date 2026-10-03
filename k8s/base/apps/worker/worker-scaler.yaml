@@ -1,0 +1,21 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: worker-redis-streams
+  namespace: trading-alerts
+spec:
+  scaleTargetRef:
+    name: worker
+  pollingInterval: 15
+  cooldownPeriod: 60
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  triggers:
+    - type: redis-streams
+      metadata:
+        address: redis:6379
+        passwordFromEnv: REDIS_PASSWORD
+        stream: alerts
+        consumerGroup: workers
+        lagCount: "50"
+        activationLagCount: "1"

@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api
+  namespace: trading-alerts
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: alerts.local
+      http:
+        paths:
+          - path: /webhook/tradingview
+            pathType: Exact
+            backend:
+              service:
+                name: api
+                port:
+                  name: http
