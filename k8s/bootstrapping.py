@@ -7,7 +7,12 @@ from pathlib import Path
 
 from create_sealed_secret import main as create_sealed_secret
 
-
+"""
+To avoid initializing custom resources before their CRDs are established,
+we split the deployment into two phases:
+1. Install external infrastructure: KEDA + sealed secrets.
+2. Install the application overlay, which may contain custom resources.
+"""
 
 
 KUSTOMIZATION_FILES = (
@@ -137,15 +142,24 @@ def main():
     wait_for_crd("scaledobjects.keda.sh")
     wait_for_crd("sealedsecrets.bitnami.com")
 
-
     # Phase 2: Install the application overlay, which may contain custom resources.
-    # -------
-    # We intentionally do not wait for the KEDA operator to be ready.
-    # Kubernetes can create the Custom Resources as soon as its CRD exists.
-    # Once controllers start, it will discover and reconcile the existing resource.
+    # Wait until the controller can serve its public certificate to kubeseal.
+    run(
+        "kubectl",
+        "rollout",
+        "status",
+        "deployment/sealed-secrets-controller",
+        "--namespace",
+        "kube-system",
+        "--timeout=120s",
+    )
     secret_creation_status = create_sealed_secret()
     if secret_creation_status != 0:
         sys.exit(secret_creation_status)
+
+    # We intentionally do not wait for the KEDA operator to be ready.
+    # Kubernetes can create the Custom Resources as soon as its CRD exists.
+    # Once controllers start, it will discover and reconcile the existing resource.
     run("kubectl", "apply", "-k", str(selected_overlay))
 
     print("Deployment completed successfully.")

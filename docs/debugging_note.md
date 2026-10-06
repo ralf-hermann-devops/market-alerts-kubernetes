@@ -59,3 +59,27 @@ resource kinds.
 the corresponding CRD exists and is established before investigating the
 application resource.
 
+
+## 4. Generating the SealedSecret before applying the application overlay
+
+The application Kustomization will fail to build if it references the generated
+SealedSecret YAML before that file exists. Leaving the manifest out until after
+deploying the application avoids the missing-file error, but workloads that
+need the Secret may fail to start until it is created and might night to be
+rolled out again.
+
+**Solution:** After installing the Sealed Secrets CRD and controller, 
+wait for the controller deployment in `kube-system` to become ready.
+The controller has to be up to hand out its public key which is used for
+generating a Sealed Secret yaml definition.
+Then generate the SealedSecret manifest before applying the application
+overlay that references it. The generation script prompts for values without
+echoing them, fetches the controller's public certificate for `kubeseal`, and
+writes the encrypted manifest rather than a plain Secret.
+
+**Debugging tip:** For a Kustomize missing-file error, check that the generated
+manifest exists at the path in the Kustomization. If a workload cannot start
+because a Secret is missing, check whether the SealedSecret was created and
+reconciled by the controller, and confirm `kubectl` targets the intended
+cluster.
+
