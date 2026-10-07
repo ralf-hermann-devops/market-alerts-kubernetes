@@ -4,7 +4,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - apps/app-config.yaml
-  #- apps/trading-alerts-sealedsecret.yaml
+  - apps/trading-alerts-sealedsecret.yaml
   
   - apps/api
   - apps/fetcher

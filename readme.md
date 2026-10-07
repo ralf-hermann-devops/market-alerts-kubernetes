@@ -54,6 +54,12 @@ Set the `secret` to the same value as the API's `WEBHOOK_SECRET`. In TradingView
 
 The application is containerized and can also be deployed to a Kubernetes cluster. Kubernetes manifests are organized with Kustomize under `k8s/`, allowing shared configuration to be separated from environment-specific settings. A local cluster such as kind or Minikube can be used for testing, with cloud-specific configuration added when deploying to a platform such as Amazon EKS.
 
+For Minikube, build and load the application images before applying the Kubernetes manifests. Compose tags the images with the same names used by the Kubernetes deployments:
+
+```
+python .\build_and_load_images.py
+```
+
 To bootstrap a cluster, make sure `kubectl` is connected to the target cluster and both `kubectl` and `kubeseal` are available. On Windows they both should be on `PATH`.
 Then run:
 

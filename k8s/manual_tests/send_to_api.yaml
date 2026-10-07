@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: python-wget
+  namespace: trading-alerts
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: python-wget
+          image: python:3.14-alpine
+          command: ["python", "-u", "-c"]
+          args:
+            - |
+              import json
+              import os
+              import sys
+              from urllib.error import HTTPError
+              from urllib.request import Request, urlopen
+
+              payload = json.dumps({
+                  "secret": os.environ["webhook-secret"],
+                  "symbol": "AAPL",
+                  "action": "long",
+                  "price": 123.45,
+                  "timeframe": "1h",
+              }).encode()
+              request = Request(
+                  "http://api:8000/webhook/tradingview",
+                  data=payload,
+                  headers={"Content-Type": "application/json"},
+                  method="POST",
+              )
+              try:
+                  with urlopen(request, timeout=15) as response:
+                      print(f"HTTP {response.status} {response.reason}")
+                      print(response.read().decode())
+              except HTTPError as error:
+                  print(f"HTTP {error.code} {error.reason}")
+                  print(error.read().decode())
+                  sys.exit(1)
+          env:
+            - name: webhook-secret
+              valueFrom:
+                secretKeyRef:
+                  name: trading-alerts-secrets
+                  key: webhook-secret

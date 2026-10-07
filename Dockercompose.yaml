@@ -15,6 +15,7 @@ x-postgres-env: &postgres-env
 services:
   api:
     build: ./services/api
+    image: trading-api:dev
     ports: ["8000:8000"]
     environment:
       <<: *redis-env
@@ -22,6 +23,7 @@ services:
     depends_on: [redis]
   worker:
     build: ./services/worker
+    image: trading-worker:dev
     environment:
       <<: [*redis-env, *postgres-env]
       REDIS_GROUP: workers
@@ -32,6 +34,7 @@ services:
         condition: service_healthy
   fetcher:
     build: ./services/fetcher
+    image: trading-fetcher:dev
     environment:
       <<: *postgres-env
       SYMBOLS: AAPL
