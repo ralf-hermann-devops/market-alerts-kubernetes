@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: python-wget
+  generateName: python-wget-
   namespace: trading-alerts
 spec:
   backoffLimit: 0
@@ -21,7 +21,7 @@ spec:
               from urllib.request import Request, urlopen
 
               payload = json.dumps({
-                  "secret": os.environ["webhook-secret"],
+                  "secret": os.environ["WEBHOOK_SECRET"],
                   "symbol": "AAPL",
                   "action": "long",
                   "price": 123.45,
@@ -42,7 +42,7 @@ spec:
                   print(error.read().decode())
                   sys.exit(1)
           env:
-            - name: webhook-secret
+            - name: WEBHOOK_SECRET
               valueFrom:
                 secretKeyRef:
                   name: trading-alerts-secrets
