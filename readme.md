@@ -2,6 +2,16 @@
 
 This project is a small, containerized backend for collecting and processing trading alerts and market data. A webhook API accepts TradingView alerts, validates a shared secret, and places valid alerts on a Redis stream. A worker consumes the stream and stores alerts in PostgreSQL. A separate fetcher retrieves market candle data and stores it in the same database.
 
+## General architecture
+
+TradingView sends alerts to the API, which validates each alert's shared secret and publishes valid alerts to a Redis stream. The worker consumes that stream and persists alerts to PostgreSQL. Independently, the market-data fetcher periodically retrieves candle data from Yahoo Finance and stores it in PostgreSQL.
+
+The same services can run locally with Docker Compose or be deployed to Kubernetes. In Kubernetes, ingress routes webhook requests to the API, network policies constrain service access to Redis and PostgreSQL, and KEDA scales the worker based on Redis stream lag and CPU utilization.
+
+![Architecture overview showing the local Docker Compose and Kubernetes deployments](docs/architecture_overview.png)
+
+You can [open the architecture image](docs/architecture_overview.png) to view it larger.
+
 ## Project structure
 
 - `services` — application code
@@ -44,7 +54,8 @@ Set the `secret` to the same value as the API's `WEBHOOK_SECRET`. In TradingView
 
 The application is containerized and can also be deployed to a Kubernetes cluster. Kubernetes manifests are organized with Kustomize under `k8s/`, allowing shared configuration to be separated from environment-specific settings. A local cluster such as kind or Minikube can be used for testing, with cloud-specific configuration added when deploying to a platform such as Amazon EKS.
 
-To bootstrap a cluster, make sure `kubectl` is connected to the target cluster and both `kubectl` and `kubeseal` are available on `PATH`, then run:
+To bootstrap a cluster, make sure `kubectl` is connected to the target cluster and both `kubectl` and `kubeseal` are available. On Windows they both should be on `PATH`.
+Then run:
 
 ```bash
 python k8s/bootstrapping.py
