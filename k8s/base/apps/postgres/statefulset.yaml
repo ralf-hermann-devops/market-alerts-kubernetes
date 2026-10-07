@@ -39,6 +39,26 @@ spec:
               mountPath: /docker-entrypoint-initdb.d/init.sql
               subPath: init.sql
               readOnly: true
+          readinessProbe:
+            exec:
+              command: [sh, -c, pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command: [sh, -c, pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"]
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
       volumes:
         - name: postgres-init
           configMap:

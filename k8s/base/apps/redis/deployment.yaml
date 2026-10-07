@@ -25,3 +25,22 @@ spec:
           ports:
             - name: redis
               containerPort: 6379
+          readinessProbe:
+            exec:
+              command: [sh, -c, REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping | grep -q PONG]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            exec:
+              command: [sh, -c, REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping | grep -q PONG]
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

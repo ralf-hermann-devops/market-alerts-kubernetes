@@ -29,6 +29,7 @@ spec:
                 secretKeyRef:
                   name: trading-alerts-secrets
                   key: postgres-password
+          # add a way to test for readiness and liveness probes
           resources:
             requests:
               cpu: 100m
