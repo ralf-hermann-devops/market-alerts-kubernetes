@@ -87,3 +87,21 @@ reconciled by the controller, and confirm `kubectl` targets the intended
 cluster.
 
 
+## 5. Python output buffering in container logs
+
+While testing the API from a temporary Kubernetes Pod, Python `print()` output
+did not appear in `kubectl logs` until the process exited. This became apparent
+when writing and running tests that needed to observe output while the
+container was still running.
+
+**Solution:** Run Python with `-u` or set `PYTHONUNBUFFERED=1` in the container
+environment to make stdout and stderr unbuffered. Python's standard `logging`
+handlers normally flush each emitted log record. Because most my application
+output uses `logging`, the buffering issue only became apparent when tests used
+`print()` and expected to see output immediately while watching Kubernetes
+logs. Unbuffered output is therefore most relevant to direct `print()` calls
+and other buffered writes, rather than ordinary logging.
+
+**Debugging takeaway:** If output appears only after a container exits, check whether
+it is using buffered stdout before assuming the application is not producing
+logs.
