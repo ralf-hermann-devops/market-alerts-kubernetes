@@ -4,23 +4,26 @@ This document records problems encountered while developing and deploying the
 Trading Alerts application, how they were investigated, and what resolved them.
 
 
-## 1. Testing the full service flow and locating failures
+## 1. Developing and integrating microservices
 
-API unit tests alone could not verify that a webhook traveled through Redis,
-was consumed by the worker, and was persisted in PostgreSQL, while testing only
-the full stack made it difficult to isolate a failing service boundary.
+Debugging microservices independently is more challenging than monoliths.
+Unlike a monolith, their components run as separate services with distinct
+configuration, connectivity, and data-format assumptions. In this application,
+a webhook passes from the API through Redis to the worker and is then stored in
+PostgreSQL. A service can work in isolation while a problem at one of these
+boundaries causes the overall flow to fail.
 
 **Solution:** Test at multiple levels. API TestClient tests cover health
 checks, valid and invalid webhook secrets, and logging behavior. Docker smoke
-tests exercise the API and worker in containers. The API-to-worker integration
-test sends a webhook and verifies that the worker writes the expected event to
-PostgreSQL.
+tests exercise the API and worker in containers, while the API-to-worker
+integration test verifies that a webhook is consumed and persisted. The
+container tests use their own Compose project names and clean up containers and
+volumes afterward, helping avoid interference from earlier runs.
 
-The container tests use their own Compose project names and clean up containers
-and volumes afterward, helping avoid interference from earlier runs. When an
-integration test fails, inspect API and worker logs and check Redis/PostgreSQL
-readiness, then use the service boundaries in the first section to narrow down
-the cause.
+**Debugging takeaway:** Test each service on its own, then verify the
+cross-service flow. When integration fails, trace the request through each
+boundary in order—checking logs, readiness, connectivity, and message formats—
+instead of assuming that individually healthy services make a healthy system.
 
 
 ## 2. Inconsistent configuration and communication between microservices
@@ -39,7 +42,7 @@ maintaining separate copies. Keep message production and consumption in sync
 by checking the format written to the Redis stream against what the worker
 reads.
 
-**Debugging tip:** Trace the path one boundary at a time: verify webhook
+**Debugging takeaway:** Trace the path one boundary at a time: verify webhook
 authentication at the API, API-to-Redis and worker-to-Redis connectivity, the
 stream message format, and finally worker-to-PostgreSQL connectivity and schema
 compatibility.
@@ -55,7 +58,7 @@ infrastructure, including KEDA and Sealed Secrets, and wait for their CRDs to
 be established. Only then apply application resources that use those custom
 resource kinds.
 
-**Debugging tip:** If Kubernetes reports an unknown resource kind, check that
+**Debugging takeaway:** If Kubernetes reports an unknown resource kind, check that
 the corresponding CRD exists and is established before investigating the
 application resource.
 
@@ -77,9 +80,10 @@ overlay that references it. The generation script prompts for values without
 echoing them, fetches the controller's public certificate for `kubeseal`, and
 writes the encrypted manifest rather than a plain Secret.
 
-**Debugging tip:** For a Kustomize missing-file error, check that the generated
+**Debugging takeaway:** For a Kustomize missing-file error, check that the generated
 manifest exists at the path in the Kustomization. If a workload cannot start
 because a Secret is missing, check whether the SealedSecret was created and
 reconciled by the controller, and confirm `kubectl` targets the intended
 cluster.
+
 
