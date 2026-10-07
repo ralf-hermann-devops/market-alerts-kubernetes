@@ -56,8 +56,8 @@ The application is containerized and can also be deployed to a Kubernetes cluste
 
 For Minikube, build and load the application images before applying the Kubernetes manifests. Compose tags the images with the same names used by the Kubernetes deployments:
 
-```
-python .\build_and_load_images.py
+```bash
+python ./minikube/build_and_load_images.py
 ```
 
 To bootstrap a cluster, make sure `kubectl` is connected to the target cluster and both `kubectl` and `kubeseal` are available. On Windows they both should be on `PATH`.

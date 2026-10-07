@@ -1,0 +1,37 @@
+name: Application CI
+
+on:
+  push:
+    # only run pipeline if changes are made to the application code,
+    # docker compose or the pipline itself
+    paths:    
+      - "services/**"
+      - "Dockercompose.yaml"
+      - ".github/workflows/application-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test services
+    runs-on: ubuntu-latest
+    env:
+    # tells tests not to rebuild images, but use the ones built in the previous step
+      COMPOSE_NO_REBUILD_IN_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14.7"
+      - name: Install API test dependencies
+        run: python -m pip install -r services/api/requirements.txt
+      - name: Run API unit tests
+        run: python -m pytest services/api/tests/test_testclient_api.py
+      - name: Build service images
+        run: docker compose -f Dockercompose.yaml build api worker fetcher
+      - name: Test worker processing
+        run: python services/worker/tests/docker_worker_smoke_test.py
+      - name: Test API-to-worker integration
+        run: python services/tests/docker_api_worker_integration_test.py
+
