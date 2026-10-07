@@ -39,19 +39,20 @@ spec:
               mountPath: /docker-entrypoint-initdb.d/init.sql
               subPath: init.sql
               readOnly: true
-          readinessProbe:
+          readinessProbe: # 30s to unready
             exec:
               command: [sh, -c, pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"]
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 6
-          livenessProbe:
+            failureThreshold: 3
+          livenessProbe: # 120s to restart
             exec:
               command: [sh, -c, pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"]
             initialDelaySeconds: 30
             periodSeconds: 20
             timeoutSeconds: 5
+            failureThreshold: 6  # higher than readinessProbe to give pod time to recover before taking it down
           resources:
             requests:
               cpu: 250m

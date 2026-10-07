@@ -34,7 +34,7 @@ spec:
                 secretKeyRef:
                   name: trading-alerts-secrets
                   key: redis-password
-          readinessProbe:
+          readinessProbe: # 30s to unready
             httpGet:
               path: /readyz
               port: http
@@ -42,14 +42,14 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 3
-          livenessProbe:
+          livenessProbe: # 120s to restart
             httpGet:
               path: /healthz
               port: http
             initialDelaySeconds: 10
             periodSeconds: 20
             timeoutSeconds: 3
-            failureThreshold: 3
+            failureThreshold: 6
           resources:
             requests:
               cpu: 100m
