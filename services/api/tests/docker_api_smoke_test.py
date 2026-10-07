@@ -10,7 +10,6 @@ import time
 ROOT = Path(__file__).resolve().parents[3]
 COMPOSE_FILE = ROOT / "Dockercompose.yaml"
 COMPOSE_PROJECT = f"api-smoke-{os.getpid()}"
-CONTAINER_NAME = "api-local_api-smoketest"
 
 def run(cmd, check=True, cwd=None):
     print("$", " ".join(cmd))
@@ -35,6 +34,10 @@ def compose_service_environment(service):
     return compose_config["services"][service].get("environment", {})
 
 
+def compose_build_option():
+    return ["--no-build"] if os.getenv("COMPOSE_NO_REBUILD_IN_TESTS") == "1" else ["--build"]
+
+
 def request_http(path, timeout=30):
     deadline = time.time() + timeout
     last_output = ""
@@ -49,18 +52,6 @@ def request_http(path, timeout=30):
         time.sleep(1)
 
     return last_output
-
-
-def ensure_redis():
-    compose("up", "-d", "redis")
-
-
-def build_image():
-    compose("build", "api")
-
-
-def start_api():
-    compose("run", "-d", "--no-deps", "--use-aliases", "--name", CONTAINER_NAME, "api")
 
 
 def send_webhook(secret, symbol="AAPL", action="long", price=123.45, timeframe="1h"):
@@ -115,7 +106,7 @@ def test_endpoints(webhook_secret):
 
 def summarize_results(results):
     if results is None:
-        return ["failed: All smoke tests, Got no results to summarize."]
+        return False, ["failed: All smoke tests, Got no results to summarize."]
     checks = [
         ("Healthz", '{"ok":true}' in results["healthz"]),
         ("Readyz", '{"ready":true}' in results["readyz"]),
@@ -127,11 +118,13 @@ def summarize_results(results):
         ("Invalid Webhook", results["invalid_webhook"]["status_code"] == 401),
     ]
 
+    all_passed = True
     output = []
     for label, passed in checks:
+        all_passed = all_passed and passed
         status = "passed" if passed else "failed"
         output.append(f"{status}: {label}-test")
-    return output
+    return all_passed, output
 
 
 def cleanup():
@@ -142,14 +135,15 @@ if __name__ == "__main__":
     results = None
     try:
         api_environment = compose_service_environment("api")
-        ensure_redis()
-        build_image()
-        start_api()
+        compose("up", *compose_build_option(), "-d", "api")
         time.sleep(5)  # wait for the API to start
         results = test_endpoints(api_environment["WEBHOOK_SECRET"])
     finally:
         cleanup()
-        
+
         print("\nSummary:")
-        for line in summarize_results(results):
+        all_passed, summary = summarize_results(results)
+        for line in summary:
             print(line)
+        if not all_passed:
+            raise SystemExit(1)

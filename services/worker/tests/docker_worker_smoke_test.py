@@ -47,6 +47,10 @@ def compose(*args, check=True, show_command=True):
     )
 
 
+def compose_build_option():
+    return ["--no-build"] if os.getenv("COMPOSE_NO_REBUILD_IN_TESTS") == "1" else ["--build"]
+
+
 
 def wait_for(description, *args, expected_output=None):
     deadline = time.monotonic() + WAIT_TIMEOUT
@@ -140,11 +144,12 @@ def print_worker_logs():
 def main():
     if not COMPOSE_FILE.is_file():
         raise FileNotFoundError(f"Compose file not found: {COMPOSE_FILE}")
-
+    
+    passed = False
     try:
         compose("up", "-d", "redis", "postgres")
         wait_for_dependencies()
-        compose("up", "--build", "-d", "worker")
+        compose("up", *compose_build_option(), "-d", "worker")
         expected = enqueue_events()
         passed, processed = wait_for_processed_events(expected)
         status = "passed" if passed else "failed"
@@ -159,7 +164,8 @@ def main():
         raise
     finally:
         compose("down", "--volumes", "--remove-orphans", check=False)
+    return 0 if passed else 1
 
 
 if __name__ == "__main__":
-    main()
+    SystemExit(main())

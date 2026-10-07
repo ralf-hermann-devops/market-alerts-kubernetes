@@ -52,6 +52,10 @@ def compose_service_environment(service):
     return config["services"][service].get("environment", {})
 
 
+def compose_build_option():
+    return ["--no-build"] if os.getenv("COMPOSE_NO_REBUILD_IN_TESTS") == "1" else ["--build"]
+
+
 def request_api(path, payload=None):
     command = "wget -S -T 5 -O -"
     if payload is not None:
@@ -128,7 +132,7 @@ def main():
         raise FileNotFoundError(f"Compose file not found: {COMPOSE_FILE}")
 
     try:
-        compose("up", "--build", "-d", "api", "worker", "redis", "postgres")
+        compose("up", *compose_build_option(), "-d", "api", "worker", "redis", "postgres")
         wait_for_api()
 
         response = request_api(
@@ -162,4 +166,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    SystemExit(main())
