@@ -76,7 +76,6 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    needs: [lint, dependency-audit]
     env:
       # tells tests not to rebuild images, but use the ones built in the previous step
       COMPOSE_NO_REBUILD_IN_TESTS: "1"

@@ -37,7 +37,8 @@ logger.info(
 )
 try:
     r.xgroup_create(stream_name, group, id="0", mkstream=True)
-except redis.ResponseError: pass                     # group exists
+except redis.ResponseError:
+    pass  # group exists
 logger.info("Redis consumer group is ready")
 
 logger.info("Connecting to PostgreSQL host=%s", os.environ["POSTGRES_HOST"])

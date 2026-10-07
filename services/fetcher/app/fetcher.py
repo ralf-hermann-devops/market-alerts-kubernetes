@@ -1,7 +1,10 @@
 # services/fetcher/main.py
 import datetime
+import os
+import sys
 from decimal import Decimal
-import os, sys, psycopg
+
+import psycopg
 import yfinance as yf
 
 SYMBOLS = os.environ["SYMBOLS"].split(",")          # from ConfigMap
@@ -45,6 +48,8 @@ def main():
     print("done")
 
 if __name__ == "__main__":
-    try: main()
+    try:
+        main()
     except Exception as e:
-        print(f"fetch failed: {e}", file=sys.stderr); sys.exit(1)
+        print(f"fetch failed: {e}", file=sys.stderr)
+        sys.exit(1)
