@@ -19,3 +19,7 @@ spec:
         consumerGroup: workers
         lagCount: "50"
         activationLagCount: "1"
+    - type: cpu   # less important, but we want to scale up if CPU is high to get ahead of Redis lag building up
+      metricType: Utilization
+      metadata:
+        value: "80"
