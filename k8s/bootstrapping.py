@@ -193,9 +193,8 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     secret_creation_status = create_sealed_secret(secret_args)
     if secret_creation_status != 0:
-        raise subprocess.CalledProcessError(
-            secret_creation_status, "create_sealed_secret"
-        )
+        # Hide the traceback from the user. Might be misleading and not helpful in this context.
+        raise SystemExit(secret_creation_status)
 
     # We intentionally do not wait for the KEDA operator to be ready.
     # Kubernetes can create the Custom Resources as soon as its CRD exists.

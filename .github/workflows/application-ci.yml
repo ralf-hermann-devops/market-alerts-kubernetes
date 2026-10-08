@@ -212,6 +212,15 @@ jobs:
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
 
+      - name: Install kubeseal
+        run: |
+          KUBESEAL_VERSION=0.40.0
+          curl -fsSLo "$RUNNER_TEMP/kubeseal.tar.gz" \
+            "https://github.com/bitnami/sealed-secrets/releases/download/v${KUBESEAL_VERSION}/kubeseal-${KUBESEAL_VERSION}-linux-amd64.tar.gz"
+          tar -xzf "$RUNNER_TEMP/kubeseal.tar.gz" -C "$RUNNER_TEMP" kubeseal
+          sudo install -m 755 "$RUNNER_TEMP/kubeseal" /usr/local/bin/kubeseal
+          kubeseal --version
+
       # https://github.com/marketplace/actions/kind-cluster
       - name: Create kind cluster
         uses: helm/kind-action@v1
