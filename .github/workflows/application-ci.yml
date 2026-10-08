@@ -17,7 +17,7 @@ env:
   SERVICE_IMAGES_ARTIFACT: service-images
 
 jobs:
-  lint:
+  application-lint:
     name: Lint Python services
     runs-on: ubuntu-latest
     steps:
@@ -30,7 +30,7 @@ jobs:
       - name: Lint Python code
         run: ruff check --isolated services   # running recommended default checks
 
-  app-dependency-audit:
+  application-dependency-audit:
     name: Audit app dependencies
     runs-on: ubuntu-latest
     strategy:
@@ -116,89 +116,8 @@ jobs:
       - name: Test API-to-worker integration
         run: python services/tests/docker_api_worker_integration_test.py
   
-  kubernetes-manifests-lint:
-    name: Lint Kubernetes manifests (${{ matrix.target }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      # Run a lint check on each kustomize overlay, the base and external infrastructure
-      # base is checked independently of overlays, because overlays may not include 
-      # all base manifests and base should be ok on its own without overlays
-      # The external infrastructure overlay is checked in case manual changes are made to it
-      matrix:
-        include:
-          - target: base
-            path: k8s/base
-            kustomize_args: ""
-          - target: dev
-            path: k8s/overlays/dev
-            kustomize_args: ""
-          # external infrastructure overlays are checked with --enable-helm for kustomize
-          # due to keda getting installed with it.
-          - target: infrastructure
-            path: k8s/infrastructure
-            kustomize_args: --enable-helm
-    steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
-        if: matrix.target == 'infrastructure'
-        with:
-          version: v3.17.3
-      
-      # General note on kubeconform usage:
-      # External CRs are validated using the additional scheme location's CRD catalog
-      # on the additionally linked GitHub repository.
-      # Additionally kubeconform needs -skip CustomResourceDefinition so it doesn't
-      # try to check CRDs themselves which don't have a scheme available
-      - name: Install kubeconform
-        run: |
-          KUBECONFORM_VERSION=0.8.0
-          curl -fsSLo "$RUNNER_TEMP/kubeconform.tar.gz" \
-            "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
-          tar -xzf "$RUNNER_TEMP/kubeconform.tar.gz" -C "$RUNNER_TEMP" kubeconform
-          sudo install "$RUNNER_TEMP/kubeconform" /usr/local/bin/kubeconform
-          kubeconform -v
-
-      - name: Scan individual ${{ matrix.target }} manifests
-        # First scan all individual manifests in the target directory.
-        # This reports schema problems in source manifests before transformations are applied.
-        # This makes it easier to identify and fix issues across the target saves
-        # the responsible developer time in fixing them all at once instead of one by one.
-        run: |
-          kubeconform \
-            -summary \
-            -output pretty \
-            -skip CustomResourceDefinition \
-            -ignore-filename-pattern '(^|[\\/])kustomization\.yaml$' \
-            -schema-location default \
-            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            "${{ matrix.path }}"
-
-      - name: Build assembled ${{ matrix.target }} manifests
-        # This build catches composition errors that kubeconform's schema checks don't look for,
-        # such as invalid resource references, patch targets, or Helm rendering failures.
-        # It also produces the final output for kubeconform to validate below.
-        run: |
-          kubectl kustomize \
-            "${{ matrix.path }}" \
-            ${{ matrix.kustomize_args }} \
-            > "$RUNNER_TEMP/combined.yaml"
-          
-      - name: Scan combined ${{ matrix.target }} manifests
-        # kubeconform runs again, this time on the combined manifest
-        # This explicitly checks what kustomize will actually produce including:
-        # the effects of patches, generators, and transformations.
-        run: |
-          kubeconform \
-            -summary \
-            -output pretty \
-            -skip CustomResourceDefinition \
-            -schema-location default \
-            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            "$RUNNER_TEMP/combined.yaml"
-
-  kubernetes-manifests:
-    name: Validate Kubernetes manifests (${{ matrix.target }})
+  kubernetes-manifests-validation:
+    name: Kubernetes manifests validation
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
