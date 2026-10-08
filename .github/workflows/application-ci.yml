@@ -3,7 +3,7 @@ name: Application CI
 on:
   push:
     # only run pipeline if changes are made to the application code,
-    # docker compose or the pipline itself
+    # docker-compose file or the pipline itself
     paths:    
       - "services/**"
       - "Dockercompose.yaml"
@@ -11,6 +11,9 @@ on:
 
 permissions:
   contents: read
+
+env:
+  SERVICE_IMAGES_ARTIFACT: service-images
 
 jobs:
   lint:
@@ -45,8 +48,26 @@ jobs:
       - name: Audit dependencies
         run: pip-audit -r services/${{ matrix.service }}/requirements.txt
 
+  build-service-images:
+    name: Build service images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build service images
+        run: docker compose -f Dockercompose.yaml build --pull api worker fetcher
+      - name: Save service images
+        run: docker save -o "${{ env.SERVICE_IMAGES_ARTIFACT }}.tar" trading-api:dev trading-worker:dev trading-fetcher:dev
+      - name: Upload service images
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.SERVICE_IMAGES_ARTIFACT }}
+          path: "${{ env.SERVICE_IMAGES_ARTIFACT }}.tar"
+          compression-level: 0
+          retention-days: 1
+
   container-image-scan:
     name: Scan service images
+    needs: build-service-images
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -54,8 +75,10 @@ jobs:
         service: [api, worker, fetcher]
     steps:
       - uses: actions/checkout@v4
-      - name: Build service images
-        run: docker compose -f Dockercompose.yaml build --pull api worker fetcher
+      - name: Load service images
+        uses: ./.github/actions/load-service-images
+        with:
+          artifact: ${{ env.SERVICE_IMAGES_ARTIFACT }}
       - name: Scan ${{ matrix.service }} image for vulnerabilities
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -69,6 +92,7 @@ jobs:
 
   application-tests:
     name: Application tests
+    needs: build-service-images
     runs-on: ubuntu-latest
     env:
       # tells tests not to rebuild images, but use the ones built in the previous step
@@ -82,8 +106,10 @@ jobs:
         run: python -m pip install -r services/api/requirements.txt
       - name: Run API unit tests
         run: python -m pytest services/api/tests/test_testclient_api.py
-      - name: Build service images
-        run: docker compose -f Dockercompose.yaml build --pull api worker fetcher
+      - name: Load service images
+        uses: ./.github/actions/load-service-images
+        with:
+          artifact: ${{ env.SERVICE_IMAGES_ARTIFACT }}
       - name: Test worker processing
         run: python services/worker/tests/docker_worker_smoke_test.py
       - name: Test API-to-worker integration

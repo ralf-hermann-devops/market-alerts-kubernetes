@@ -1,0 +1,16 @@
+name: Load service images
+description: Download and load the prebuilt service image artifact
+inputs:
+  artifact:
+    description: Name of the artifact containing the Docker image archive
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Download service images
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.artifact }}
+    - name: Load service images
+      shell: bash
+      run: docker load -i "${{ inputs.artifact }}.tar"
