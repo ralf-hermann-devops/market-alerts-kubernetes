@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 IMAGES = ("trading-api:dev", "trading-worker:dev", "trading-fetcher:dev")
 
 

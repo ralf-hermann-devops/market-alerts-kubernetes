@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 
+import argparse
 import re
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
+from cli_args import SECRETS, create_parser as create_common_parser, validate_secret_args
 from create_sealed_secret import main as create_sealed_secret
 
 """
@@ -22,6 +25,17 @@ KUSTOMIZATION_FILES = (
     "Kustomization.yaml",
     "Kustomization.yml",
 )
+
+
+def create_parser() -> argparse.ArgumentParser:
+    parser = create_common_parser(
+        "Bootstrap Kubernetes infrastructure and an application overlay."
+    )
+    parser.add_argument(
+        "--overlay",
+        help="Overlay directory name to apply (required for non-interactive mode if ambiguous)",
+    )
+    return parser
 
 
 def run(*args):
@@ -131,9 +145,31 @@ def apply_infrastructure(infrastructure_dir):
             sys.exit(result.returncode)
 
 
-def main():
+def main(argv: Sequence[str] | None = None) -> None:
+    parser = create_parser()
+    args = parser.parse_args(argv)
+    validate_secret_args(args, parser)
+
     k8s_dir = Path(__file__).resolve().parent
-    selected_overlay = choose_overlay(find_overlays(k8s_dir / "overlays"))
+    overlays = find_overlays(k8s_dir / "overlays")
+    if args.overlay is not None:
+        selected_overlay = next(
+            (overlay for overlay in overlays if overlay.name == args.overlay),
+            None,
+        )
+        if selected_overlay is None:
+            parser.error(
+                f"unknown overlay {args.overlay!r}; available overlays: "
+                + ", ".join(overlay.name for overlay in overlays)
+            )
+    elif args.non_interactive:
+        if len(overlays) != 1:
+            parser.error(
+                "--non-interactive requires --overlay when multiple overlays are available"
+            )
+        selected_overlay = overlays[0]
+    else:
+        selected_overlay = choose_overlay(overlays)
 
     # Phase 1: Install external infrastructure: KEDA + sealed secrets.
     apply_infrastructure(k8s_dir / "infrastructure")
@@ -153,7 +189,16 @@ def main():
         "kube-system",
         "--timeout=120s",
     )
-    secret_creation_status = create_sealed_secret()
+    secret_args = [
+        argument
+        for attribute, option, _ in SECRETS
+        if (value := getattr(args, attribute)) is not None
+        for argument in (f"--{option}", value)
+    ]
+    if args.non_interactive:
+        secret_args.append("--non-interactive")
+
+    secret_creation_status = create_sealed_secret(secret_args)
     if secret_creation_status != 0:
         sys.exit(secret_creation_status)
 

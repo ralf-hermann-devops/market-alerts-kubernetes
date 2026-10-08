@@ -115,7 +115,8 @@ jobs:
         run: python services/worker/tests/docker_worker_smoke_test.py
       - name: Test API-to-worker integration
         run: python services/tests/docker_api_worker_integration_test.py
-  
+
+
   kubernetes-manifests-validation:
     name: Kubernetes manifests validation
     runs-on: ubuntu-latest
@@ -196,3 +197,46 @@ jobs:
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             "$RUNNER_TEMP/combined.yaml"
+
+
+  # more kubernetes testing https://yrkan.com/blog/kubernetes-testing-strategies/
+
+
+  kubernetes-smoke-test:
+    name: Test Kubernetes deployment
+    needs: [application-tests, kubernetes-manifests-validation]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      # https://github.com/marketplace/actions/kind-cluster
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: app-test
+
+      - name: Load service images
+        uses: ./.github/actions/load-service-images
+        with:
+          artifact: ${{ env.SERVICE_IMAGES_ARTIFACT }}
+
+      - name: Load images into kind
+        run: |
+          kind load docker-image \
+            trading-api:dev \
+            trading-worker:dev \
+            trading-fetcher:dev \
+            --name app-test
+
+      - name: Run bootstrapping script to deploy services to kind cluster
+        run: python k8s/bootstrapping.py --webhook-secret "dummyWebhookSecret" --redis-password "dummyRedisPassword" --postgres-password "dummyPostgresPassword" --non-interactive --overlay dev
+
+      # Add deployment and smoke-test steps here
+
+
+  #publish-images:
+  #  name: Publish container images
+  #  needs: application-tests
