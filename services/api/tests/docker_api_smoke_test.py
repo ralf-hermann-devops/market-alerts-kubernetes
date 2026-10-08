@@ -3,9 +3,8 @@ import os
 import re
 import shlex
 import subprocess
-from pathlib import Path
 import time
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 COMPOSE_FILE = ROOT / "Dockercompose.yaml"
@@ -13,7 +12,7 @@ COMPOSE_PROJECT = f"api-smoke-{os.getpid()}"
 
 def run(cmd, check=True, cwd=None):
     print("$", " ".join(cmd))
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, check=False)
     if check and result.returncode != 0:
         raise RuntimeError(f"Command failed ({result.returncode}): {' '.join(cmd)}\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}")
     return result

@@ -6,7 +6,6 @@ import time
 from decimal import Decimal
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[3]
 COMPOSE_FILE = ROOT / "Dockercompose.yaml"
 PROJECT_NAME = f"worker-smoke-{os.getpid()}"
@@ -22,7 +21,7 @@ EVENTS = [
 def run(command, check=True, show_command=True):
     if show_command:
         print("$", " ".join(str(part) for part in command), flush=True)
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
     if check and result.returncode:
         raise RuntimeError(
             f"Command failed ({result.returncode}): {' '.join(str(part) for part in command)}"
@@ -168,4 +167,4 @@ def main():
 
 
 if __name__ == "__main__":
-    SystemExit(main())
+    raise SystemExit(main())
