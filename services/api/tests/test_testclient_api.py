@@ -5,6 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import redis
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -73,3 +74,7 @@ def test_webhook_rejects_invalid_secret(monkeypatch, caplog):
     assert response.status_code == 401
     assert "Rejected webhook with invalid secret" in caplog.text
     assert "wrong-secret" not in caplog.text
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))
