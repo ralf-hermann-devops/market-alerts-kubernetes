@@ -27,7 +27,7 @@ jobs:
         run: ruff check --isolated --select E4,E7,E9,F services
 
   app-dependency-audit:
-    name: Audit ${{ matrix.service }} dependencies
+    name: Audit app dependencies
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -64,6 +64,8 @@ jobs:
           exit-code: "1"
           ignore-unfixed: true
           severity: HIGH,CRITICAL
+          # file doesnt take in account the actually installed and updated pip dependencies of the image
+          skip-files: /usr/local/lib/python3.14/site-packages/pip/_vendor/bom.cdx.json  
 
   application-tests:
     name: Application tests
