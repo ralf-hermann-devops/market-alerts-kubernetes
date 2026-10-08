@@ -26,7 +26,7 @@ jobs:
       - name: Lint Python code
         run: ruff check --isolated --select E4,E7,E9,F services
 
-  dependency-audit:
+  app-dependency-audit:
     name: Audit ${{ matrix.service }} dependencies
     runs-on: ubuntu-latest
     strategy:
@@ -45,33 +45,21 @@ jobs:
       - name: Audit dependencies
         run: pip-audit -r services/${{ matrix.service }}/requirements.txt
 
-  image-scan:
+  container-image-scan:
     name: Scan service images
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, worker, fetcher]
     steps:
       - uses: actions/checkout@v4
       - name: Build service images
-        run: docker compose -f Dockercompose.yaml build api worker fetcher
-      - name: Scan API image for vulnerabilities
+        run: docker compose -f Dockercompose.yaml build --pull api worker fetcher
+      - name: Scan ${{ matrix.service }} image for vulnerabilities
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: trading-api:dev
-          format: table
-          exit-code: "1"
-          ignore-unfixed: true
-          severity: HIGH,CRITICAL
-      - name: Scan worker image for vulnerabilities
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: trading-worker:dev
-          format: table
-          exit-code: "1"
-          ignore-unfixed: true
-          severity: HIGH,CRITICAL
-      - name: Scan fetcher image for vulnerabilities
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: trading-fetcher:dev
+          image-ref: trading-${{ matrix.service }}:dev
           format: table
           exit-code: "1"
           ignore-unfixed: true
@@ -93,7 +81,7 @@ jobs:
       - name: Run API unit tests
         run: python -m pytest services/api/tests/test_testclient_api.py
       - name: Build service images
-        run: docker compose -f Dockercompose.yaml build api worker fetcher
+        run: docker compose -f Dockercompose.yaml build --pull api worker fetcher
       - name: Test worker processing
         run: python services/worker/tests/docker_worker_smoke_test.py
       - name: Test API-to-worker integration
