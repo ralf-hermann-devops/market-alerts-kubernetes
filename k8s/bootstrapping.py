@@ -3,11 +3,11 @@
 import argparse
 import re
 import subprocess
-import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from cli_args import SECRETS, create_parser as create_common_parser, validate_secret_args
+from cli_args import SECRETS, validate_secret_args
+from cli_args import create_parser as create_common_parser
 from create_sealed_secret import main as create_sealed_secret
 
 """
@@ -40,11 +40,7 @@ def create_parser() -> argparse.ArgumentParser:
 
 def run(*args):
     print(f"$ {' '.join(args)}")
-
-    result = subprocess.run(args)
-
-    if result.returncode != 0:
-        sys.exit(result.returncode)
+    subprocess.run(args, check=True)
 
 
 def wait_for_crd(crd, timeout=120):
@@ -62,8 +58,7 @@ def wait_for_crd(crd, timeout=120):
 
 def find_overlays(overlays_dir):
     if not overlays_dir.is_dir():
-        print(f"Overlay directory not found: {overlays_dir}", file=sys.stderr)
-        sys.exit(1)
+        raise FileNotFoundError(f"Overlay directory not found: {overlays_dir}")
 
     overlays = sorted(
         (
@@ -76,8 +71,7 @@ def find_overlays(overlays_dir):
     )
 
     if not overlays:
-        print(f"No Kustomize overlays found in {overlays_dir}.", file=sys.stderr)
-        sys.exit(1)
+        raise FileNotFoundError(f"No Kustomize overlays found in {overlays_dir}.")
 
     return overlays
 
@@ -91,8 +85,7 @@ def choose_overlay(overlays):
         try:
             selection = input("Select an overlay by number: ").strip()
         except (EOFError, KeyboardInterrupt):
-            print("\nOverlay selection cancelled.", file=sys.stderr)
-            sys.exit(1)
+            raise RuntimeError("Overlay selection cancelled.") from None
 
         try:
             selected_index = int(selection)
@@ -112,11 +105,12 @@ def apply_infrastructure(infrastructure_dir):
     command = ["kubectl", "kustomize", "--enable-helm", str(infrastructure_dir)]
     print(f"$ {' '.join(command)}")
 
-    build = subprocess.run(command, capture_output=True, text=True)
-    if build.stderr:
-        print(build.stderr, file=sys.stderr, end="")
-    if build.returncode != 0:
-        sys.exit(build.returncode)
+    build = subprocess.run(
+        command,
+        stdout=subprocess.PIPE,
+        text=True,
+        check=True,
+    )
 
     documents = re.split(r"(?m)^---\s*$", build.stdout)
     crds = []
@@ -136,13 +130,12 @@ def apply_infrastructure(infrastructure_dir):
 
         apply_command = ["kubectl", "apply", *options, "-f", "-"]
         print(f"$ {' '.join(apply_command)}")
-        result = subprocess.run(
+        subprocess.run(
             apply_command,
             input="\n---\n".join(manifests),
             text=True,
+            check=True,
         )
-        if result.returncode != 0:
-            sys.exit(result.returncode)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -200,7 +193,9 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     secret_creation_status = create_sealed_secret(secret_args)
     if secret_creation_status != 0:
-        sys.exit(secret_creation_status)
+        raise subprocess.CalledProcessError(
+            secret_creation_status, "create_sealed_secret"
+        )
 
     # We intentionally do not wait for the KEDA operator to be ready.
     # Kubernetes can create the Custom Resources as soon as its CRD exists.

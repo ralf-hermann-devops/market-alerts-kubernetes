@@ -18,7 +18,7 @@ env:
 
 jobs:
   application-lint:
-    name: Lint Python services
+    name: Application lint check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,7 +31,7 @@ jobs:
         run: ruff check --isolated services   # running recommended default checks
 
   application-dependency-audit:
-    name: Audit app dependencies
+    name: Application dependency audit
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -66,8 +66,8 @@ jobs:
           compression-level: 0
           retention-days: 1
 
-  container-image-scan:
-    name: Scan service images
+  image-scan:
+    name: Image scan for vulnerabilities
     needs: build-service-images
     runs-on: ubuntu-latest
     strategy:
@@ -202,8 +202,8 @@ jobs:
   # more kubernetes testing https://yrkan.com/blog/kubernetes-testing-strategies/
 
 
-  kubernetes-smoke-test:
-    name: Test Kubernetes deployment
+  kubernetes-deployment-test:
+    name: Kubernetes deployment test
     needs: [application-tests, kubernetes-manifests-validation]
     runs-on: ubuntu-latest
     steps:
