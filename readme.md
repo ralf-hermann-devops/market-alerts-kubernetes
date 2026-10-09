@@ -21,25 +21,15 @@ You can [open the architecture image](docs/architecture_overview.png) to view it
     - `services/db/` — database initialization scripts.
 - `k8s/` — everything needed to deploy and test the application on Kubernetes
     - `k8s/manifests/` — Kustomize resources for Kubernetes applications, environment overlays, and supporting infrastructure.
-    - `k8s/bootstrapping/` — scripts to bootstrap a Kubernetes cluster with Sealed Secrets and create the encrypted manifest, plus a helper for Minikube.
+    - `k8s/bootstrapping/` — scripts to bootstrap a Kubernetes cluster with Sealed Secrets and create the encrypted manifest, plus image build-and-load helpers for Minikube and kind.
     - `k8s/tests/` — tests to exercise the application in a deployed Kubernetes cluster.
 - `docs/` — project notes and architecture decision records.
     - See [`docs/architecture_decision_records/`](docs/architecture_decision_records/) for decisions about Redis, PostgreSQL, secrets, Kustomize, and staged deployment
     - See [`docs/debugging_note.md`](docs/debugging_note.md) for an overview of how errors encountered during development were investigated and addressed.
 
-## Running locally
-
-Docker Compose starts the API, worker, fetcher, Redis, and PostgreSQL:
-
-```bash
-docker compose -f Dockercompose.yaml up --build
-```
-
-The API is available at `http://localhost:8000`. Local Compose credentials are for development only; do not use them in shared or production environments.
-
 ## Sending TradingView webhook alerts
 
-Send an HTTP `POST` request to `/webhook/tradingview` with a JSON body. The `secret`, `symbol`, and `action` fields are required; `price` and `timeframe` are optional.
+Send an HTTP `POST` request to `/webhook/tradingview` with a JSON body. The `secret`, `symbol`, and `action` fields are required; `price` and `timeframe` are optional. Set the `secret` to the same value as the API's `WEBHOOK_SECRET`.
 
 ```json
 {
@@ -51,16 +41,37 @@ Send an HTTP `POST` request to `/webhook/tradingview` with a JSON body. The `sec
 }
 ```
 
-Set the `secret` to the same value as the API's `WEBHOOK_SECRET`. In TradingView, configure the alert message as this JSON and use the webhook URL for the running API. Supported action examples include `long`, `short`, and `close`.
 
-## Kubernetes
+In TradingView, configure the alert message as this JSON and use the webhook URL for the running API. Supported action examples include `long`, `short`, and `close`.
+
+TradingView requires a publicly reachable HTTPS webhook URL; `localhost` and private cluster services won't work. For Kubernetes, an Ingress needs a running Ingress controller and an externally reachable IP or load balancer, plus DNS and TLS configuration. The Ingress resource alone does not provide internet access. For local testing, use a secure tunnel such as Cloudflare Tunnel or ngrok. Keep `WEBHOOK_SECRET` private.
+
+
+## Running locally
+# Docker Compose
+
+Docker Compose starts the API, worker, fetcher, Redis, and PostgreSQL:
+
+```bash
+docker compose -f Dockercompose.yaml up --build
+```
+
+The API is available at `http://localhost:8000`. Local Compose credentials are for development only; do not use them in shared or production environments.
+
+
+# Kubernetes in minikube or kind
 
 The application is containerized and can also be deployed to a Kubernetes cluster. Kubernetes manifests are organized with Kustomize under `k8s/manifests/`, allowing shared configuration to be separated from environment-specific settings. A local cluster such as kind or Minikube can be used for testing, with cloud-specific configuration added when deploying to a platform such as Amazon EKS.
 
-For Minikube, make sure the cluster has already been started and, when required by your Minikube driver, that the Docker daemon is running. Check the cluster with `minikube status` or review the output of the image build-and-load script below. Before applying the Kubernetes manifests, use Docker Compose to build the application images; the Compose configuration tags them with the names expected by the Kubernetes deployments:
+Before applying the Kubernetes manifests, build and load the application images with the helper for your cluster type. Each helper lists existing clusters and lets you select one or more, or create a new cluster by supplying a name. The scripts use Docker Compose to build the image names expected by the deployments:
 
 ```bash
-python k8s/bootstrapping/minikube/build_and_load_images.py
+# Minikube
+python k8s/bootstrapping/minikube_kind/minikube_build_and_load_images.py
+```
+```bash
+# kind (--name <cluster> supplies the name when creating a new cluster)
+python k8s/bootstrapping/minikube_kind/kind_build_and_load_images.py
 ```
 
 To bootstrap a cluster, make sure `kubectl` points at the target cluster and both `kubectl` and `kubeseal` are available. On Windows they both should be on `PATH`.

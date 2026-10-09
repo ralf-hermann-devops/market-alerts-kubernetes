@@ -6,8 +6,8 @@ import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
-from cli_args import SECRETS, validate_secret_args
-from cli_args import create_parser as create_common_parser
+from sealed_secrets_cli_args import SECRETS, validate_secret_args
+from sealed_secrets_cli_args import create_parser as create_common_parser
 from create_sealed_secret import main as create_sealed_secret
 
 """

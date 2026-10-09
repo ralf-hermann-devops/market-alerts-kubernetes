@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 
-from cli_args import SECRETS, create_parser, validate_secret_args
+from sealed_secrets_cli_args import SECRETS, create_parser, validate_secret_args
 
 
 """

@@ -55,7 +55,7 @@ kubectl kustomize k8s/manifests/base    # | kubectl apply -f -
 kubectl kustomize k8s/manifests/overlays/dev # | kubectl apply -f -
 ```
 
-To test against a running local cluster, make sure `kubectl` targets that cluster and the required tools are installed (`kubectl`, `kubeseal`, and Helm). For Minikube, start the cluster first, ensure its Docker driver is running when applicable, and use the image build-and-load and bootstrap steps in the [Kubernetes section of the README](../readme.md#kubernetes). Once the `dev` overlay is deployed and the API, worker, and PostgreSQL are ready, run the Kubernetes smoke test:
+To test against a running local minikube or kind cluster, make sure `kubectl` targets that cluster and the required tools are installed (`kubectl`, `kubeseal`, and Helm). Use the appropriate image build-and-load helper and bootstrap steps in the [Kubernetes section of the README](../readme.md#kubernetes-in-minikube-or-kind). Once the `dev` overlay is deployed and the API, worker, and PostgreSQL are ready, run the Kubernetes smoke test:
 
 ## Run tests on the active cluster
 
@@ -64,4 +64,4 @@ To test against a running local cluster, make sure `kubectl` targets that cluste
 python k8s/tests/smoke_tests/simple_passthrough/run.py
 ```
 
-This creates a Kubernetes Job that sends a webhook through the API and checks that the worker stores the alert in PostgreSQL. It requires the `trading-alerts` namespace, the `api` service, and the `postgres-0` pod from the deployed application. The Kubernetes CI job currently validates manifests and bootstraps a kind deployment; this smoke-test script is run manually against a local cluster.
+This creates a Kubernetes Job that sends a webhook through the API and checks that the worker stores the alert in PostgreSQL. The full path depends on the `api` service, the worker consuming the alert, Redis carrying it between the API and worker, and PostgreSQL storing it. Ensure the `trading-alerts` namespace and all of those application components are deployed and ready before running the test.
