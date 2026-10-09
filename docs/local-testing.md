@@ -59,9 +59,19 @@ To test against a running local minikube or kind cluster, make sure `kubectl` ta
 
 ## Run tests on the active cluster
 
+To check that all workload controllers can start run:
+
+```bash
+python k8s/tests/smoke_tests/workload_controllers_started/run.py
+```
+
+This waits for the API, worker, Redis, and PostgreSQL workloads to become ready. The check requires the `dev` overlay and the `trading-alerts` namespace to be deployed.
+
+
 
 ```bash
 python k8s/tests/smoke_tests/simple_passthrough/run.py
 ```
 
 This creates a Kubernetes Job that sends a webhook through the API and checks that the worker stores the alert in PostgreSQL. The full path depends on the `api` service, the worker consuming the alert, Redis carrying it between the API and worker, and PostgreSQL storing it. Ensure the `trading-alerts` namespace and all of those application components are deployed and ready before running the test.
+

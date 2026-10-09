@@ -174,21 +174,14 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     # Phase 2: Install the application overlay, which may contain custom resources.
     # Wait until the controller can serve its public certificate to kubeseal.
-    run(
-        "kubectl",
-        "rollout",
-        "status",
-        "deployment/sealed-secrets-controller",
-        "--namespace",
-        "kube-system",
-        "--timeout=120s",
-    )
-    secret_args = [
-        argument
-        for attribute, option, _ in SECRETS
-        if (value := getattr(args, attribute)) is not None
-        for argument in (f"--{option}", value)
-    ]
+    run("kubectl", "rollout", "status", "deployment/sealed-secrets-controller",
+        "--namespace", "kube-system", "--timeout=120s")
+    
+    secret_args = []
+    for attribute, option, _ in SECRETS:
+        value = getattr(args, attribute)
+        if value is not None:
+            secret_args.extend((f"--{option}", value))
     if args.non_interactive:
         secret_args.append("--non-interactive")
 

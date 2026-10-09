@@ -250,10 +250,11 @@ jobs:
       - name: Run bootstrapping script to deploy services to kind cluster
         run: python k8s/bootstrapping/bootstrap_kubernetes_resources.py --webhook-secret "dummyWebhookSecret" --redis-password "dummyRedisPassword" --postgres-password "dummyPostgresPassword" --non-interactive --overlay dev
 
-
-      - name: Alert passthrough smoke test
+      - name: Workload Controllers started test
+        run: python k8s/tests/smoke_tests/workload_controllers_started/run.py
+      - name: Passthrough smoke test
         run: python k8s/tests/smoke_tests/simple_passthrough/run.py
-      # Add deployment and smoke-test steps here
+      # Add  more deployment and smoke-test steps here
 
 
   #publish-images:
