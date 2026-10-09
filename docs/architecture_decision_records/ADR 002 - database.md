@@ -3,7 +3,7 @@
 
 ## Problem
 
-The workers and the fetcher (-CronJob) store their results in a database. I need to decide how to run Postgres.
+The workers and the fetcher store their results in a database. I need to decide how to run Postgres.
 
 ## Decision
 

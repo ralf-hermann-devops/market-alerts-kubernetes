@@ -143,8 +143,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parser.parse_args(argv)
     validate_secret_args(args, parser)
 
-    k8s_dir = Path(__file__).resolve().parent
-    overlays = find_overlays(k8s_dir / "overlays")
+    k8s_dir = Path(__file__).resolve().parent.parent
+    manifests_dir = k8s_dir / "manifests"
+    overlays = find_overlays(manifests_dir / "overlays")
     if args.overlay is not None:
         selected_overlay = next(
             (overlay for overlay in overlays if overlay.name == args.overlay),
@@ -165,7 +166,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         selected_overlay = choose_overlay(overlays)
 
     # Phase 1: Install external infrastructure: KEDA + sealed secrets.
-    apply_infrastructure(k8s_dir / "infrastructure")
+    apply_infrastructure(manifests_dir / "infrastructure")
 
     # The CRD must exist before we can create a ScaledObject.
     wait_for_crd("scaledobjects.keda.sh")

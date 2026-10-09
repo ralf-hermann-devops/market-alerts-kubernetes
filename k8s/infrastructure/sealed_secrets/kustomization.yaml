@@ -1,2 +1,0 @@
-resources:
-  - controller.yaml # file downloaded to keep everything in the repository. source: https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.40.0/controller.yaml

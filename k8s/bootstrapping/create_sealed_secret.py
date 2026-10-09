@@ -50,8 +50,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     provided_secrets = {argument: getattr(args, argument) for argument, _, _ in SECRETS}
 
     script_path = Path(__file__).resolve()
-    k8s_dir = script_path.parent
-    output_path = k8s_dir / "base" / "apps" / "trading-alerts-sealedsecret.yaml"
+    k8s_dir = script_path.parent.parent
+    output_path = (
+        k8s_dir
+        / "manifests"
+        / "base"
+        / "apps"
+        / "trading-alerts-sealedsecret.yaml"
+    )
 
     for executable in ("kubectl", "kubeseal"):
         if shutil.which(executable) is None:

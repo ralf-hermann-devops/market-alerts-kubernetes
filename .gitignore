@@ -47,5 +47,5 @@ dist/
 
 # Jupyter notebooks
 .ipynb_checkpoints/
-/k8s/infrastructure/**/charts/**/*
-/k8s/base/apps/trading-alerts-sealedsecret_retried_at_*.yaml
+/k8s/manifests/infrastructure/**/charts/**/*
+/k8s/manifests/base/apps/trading-alerts-sealedsecret_retried_at_*.yaml

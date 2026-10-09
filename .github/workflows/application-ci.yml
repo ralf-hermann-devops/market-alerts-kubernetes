@@ -118,26 +118,33 @@ jobs:
 
 
   kubernetes-manifests-validation:
+    # Run a lint check on each kustomize overlay, the base and external infrastructure
+    # It checks for all manifest files for wrong value types, invalid field values,
+    # or missing fields the schema marks as required.
+    # With -strict, it also catches unknown fields and duplicate YAML keys.
+    # Kubeconform doesn't assemble Kustomize resources or check whether the original
+    # manifests, patches and generators build correctly, so kubectl kustomize is run 
+    # separately to build the final YAML for validation.
+
+    # Base is checked independently of overlays, because overlays may not include
+    # all base manifests and base should be ok on its own without overlays
+    # The external infrastructure overlay is checked in case manual changes are made to it
     name: Kubernetes manifests validation
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      # Run a lint check on each kustomize overlay, the base and external infrastructure
-      # base is checked independently of overlays, because overlays may not include 
-      # all base manifests and base should be ok on its own without overlays
-      # The external infrastructure overlay is checked in case manual changes are made to it
       matrix:
         include:
           - target: base
-            path: k8s/base
+            path: k8s/manifests/base
             kustomize_args: ""
           - target: dev
-            path: k8s/overlays/dev
+            path: k8s/manifests/overlays/dev
             kustomize_args: ""
           # external infrastructure overlays are checked with --enable-helm for kustomize
           # due to keda getting installed with it.
           - target: infrastructure
-            path: k8s/infrastructure
+            path: k8s/manifests/infrastructure
             kustomize_args: --enable-helm
     steps:
       - uses: actions/checkout@v4
@@ -202,8 +209,8 @@ jobs:
   # more kubernetes testing https://yrkan.com/blog/kubernetes-testing-strategies/
 
 
-  kubernetes-deployment-test:
-    name: Kubernetes deployment test
+  kubernetes-local-deployment-test:
+    name: Kubernetes local deployment test
     needs: [application-tests, kubernetes-manifests-validation]
     runs-on: ubuntu-latest
     steps:
@@ -241,7 +248,7 @@ jobs:
             --name app-test
 
       - name: Run bootstrapping script to deploy services to kind cluster
-        run: python k8s/bootstrapping.py --webhook-secret "dummyWebhookSecret" --redis-password "dummyRedisPassword" --postgres-password "dummyPostgresPassword" --non-interactive --overlay dev
+        run: python k8s/bootstrapping/bootstrap_kubernetes_resources.py --webhook-secret "dummyWebhookSecret" --redis-password "dummyRedisPassword" --postgres-password "dummyPostgresPassword" --non-interactive --overlay dev
 
       # Add deployment and smoke-test steps here
 

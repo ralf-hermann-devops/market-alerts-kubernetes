@@ -14,12 +14,15 @@ You can [open the architecture image](docs/architecture_overview.png) to view it
 
 ## Project structure
 
-- `services` — application code
+- `services` — application code, Dockerfiles, and tests for each service.
     - `services/api/` — webhook API that validates and queues alerts.
     - `services/worker/` — consumes queued alerts and stores them in PostgreSQL.
     - `services/fetcher/` — retrieves market candle data and stores it in PostgreSQL.
     - `services/db/` — database initialization scripts.
-- `k8s/` — Kustomize resources for Kubernetes applications and supporting infrastructure.
+- `k8s/` — everything needed to deploy and test the application on Kubernetes
+    - `k8s/manifests/` — Kustomize resources for Kubernetes applications, environment overlays, and supporting infrastructure.
+    - `k8s/bootstrapping/` — scripts to bootstrap a Kubernetes cluster with Sealed Secrets and create the encrypted manifest, plus a helper for Minikube.
+    - `k8s/tests/` — tests to exercise the application in a deployed Kubernetes cluster.
 - `docs/` — project notes and architecture decision records.
     - See [`docs/architecture_decision_records/`](docs/architecture_decision_records/) for decisions about Redis, PostgreSQL, secrets, Kustomize, and staged deployment
     - See [`docs/debugging_note.md`](docs/debugging_note.md) for an overview of how errors encountered during development were investigated and addressed.
@@ -52,19 +55,19 @@ Set the `secret` to the same value as the API's `WEBHOOK_SECRET`. In TradingView
 
 ## Kubernetes
 
-The application is containerized and can also be deployed to a Kubernetes cluster. Kubernetes manifests are organized with Kustomize under `k8s/`, allowing shared configuration to be separated from environment-specific settings. A local cluster such as kind or Minikube can be used for testing, with cloud-specific configuration added when deploying to a platform such as Amazon EKS.
+The application is containerized and can also be deployed to a Kubernetes cluster. Kubernetes manifests are organized with Kustomize under `k8s/manifests/`, allowing shared configuration to be separated from environment-specific settings. A local cluster such as kind or Minikube can be used for testing, with cloud-specific configuration added when deploying to a platform such as Amazon EKS.
 
-For Minikube, build and load the application images before applying the Kubernetes manifests. Compose tags the images with the same names used by the Kubernetes deployments:
+For Minikube, make sure the cluster has already been started and, when required by your Minikube driver, that the Docker daemon is running. Check the cluster with `minikube status` or review the output of the image build-and-load script below. Before applying the Kubernetes manifests, use Docker Compose to build the application images; the Compose configuration tags them with the names expected by the Kubernetes deployments:
 
 ```bash
-python ./minikube/build_and_load_images.py
+python k8s/bootstrapping/minikube/build_and_load_images.py
 ```
 
-To bootstrap a cluster, make sure `kubectl` is connected to the target cluster and both `kubectl` and `kubeseal` are available. On Windows they both should be on `PATH`.
+To bootstrap a cluster, make sure `kubectl` points at the target cluster and both `kubectl` and `kubeseal` are available. On Windows they both should be on `PATH`.
 Then run:
 
 ```bash
-python k8s/bootstrapping.py
+python k8s/bootstrapping/bootstrap_kubernetes_resources.py
 ```
 
 The bootstrap script installs the Sealed Secrets controller, prompts for the application secret values, writes the encrypted SealedSecret manifest, and applies the selected overlay.
@@ -75,5 +78,6 @@ The `application-ci.yml` workflow runs on pushes that change files under `servic
 
 The Docker-based test scripts honor `COMPOSE_NO_REBUILD_IN_TESTS=1`; CI sets it so the tests reuse the service images built earlier in the test job. When run locally without that variable, the scripts build images as needed. The workflow does not run on pull requests, publish images, or deploy to Kubernetes.
 
+For instructions covering local application unit tests, Docker smoke and integration tests, and Kubernetes manifest and cluster tests, see the [local testing guide](docs/local-testing.md).
 
-Platform infrastructure is managed separately in the `trading-alerts-platform` repository.
+Platform infrastructure is managed separately in the `market-alerts-platform` repository.

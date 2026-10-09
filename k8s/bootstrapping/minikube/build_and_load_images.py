@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 IMAGES = ("trading-api:dev", "trading-worker:dev", "trading-fetcher:dev")
 
 

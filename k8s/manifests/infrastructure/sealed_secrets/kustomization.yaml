@@ -1,0 +1,5 @@
+resources:
+  # file downloaded to keep everything in the repository.
+  # Version installed in the cluster is v0.40.0:
+  # source: https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.40.0/controller.yaml
+  - controller.yaml 
