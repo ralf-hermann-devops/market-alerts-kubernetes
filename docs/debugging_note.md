@@ -47,7 +47,7 @@ While testing the API from a temporary Kubernetes Pod, Python `print()` output d
 **Debugging takeaway:** If output appears only after a container exits, check whether it is using buffered stdout before assuming the application is not producing logs.
 
 
-## 6. Making local Docker tests fail correctly in CI
+## 6. Ensuring local Docker tests to fail correctly in CI
 
 The Docker-based test scripts were first used locally, where logs where just looked at and decided whether the test passed. GitHub Actions does not evaluate those messages. It primarily determines success from each command's exit code. As a result, a script could print that a test failed but still exit with status `0`, causing CI to report success.
 

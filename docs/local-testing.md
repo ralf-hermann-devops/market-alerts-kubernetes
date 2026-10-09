@@ -26,7 +26,7 @@ The API smoke test checks health, readiness, and valid and invalid webhooks. The
 ## Kubernetes manifest and cluster tests
 
 ### Skip if not testing Kubernetes manifests
-If you do not need to validate the manifests separately, you can deploy the infrastructure and selected application overlay directly with the bootstrap script described in the [Kubernetes section of the README](../readme.md#kubernetes).
+If you do not need to validate the manifests separately, you can deploy the infrastructure and selected application overlay directly with the bootstrap script described in the [Kubernetes section of the README](../readme.md#kubernetes-in-minikube-or-kind).
 
 ### Build Kustomize targets
 Before validating the base and dev overlay, deploy the infrastructure components to the cluster. Render the KEDA chart with Helm and apply the infrastructure manifests:
@@ -74,4 +74,3 @@ python k8s/tests/smoke_tests/simple_passthrough/run.py
 ```
 
 This creates a Kubernetes Job that sends a webhook through the API and checks that the worker stores the alert in PostgreSQL. The full path depends on the `api` service, the worker consuming the alert, Redis carrying it between the API and worker, and PostgreSQL storing it. Ensure the `trading-alerts` namespace and all of those application components are deployed and ready before running the test.
-

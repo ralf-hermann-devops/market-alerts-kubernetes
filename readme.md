@@ -82,6 +82,7 @@ python k8s/bootstrapping/bootstrap_kubernetes_resources.py
 ```
 
 The bootstrap script installs the Sealed Secrets controller, prompts for the application secret values, writes the encrypted SealedSecret manifest, and applies the selected overlay.
+See the [secret bootstrap and deployment diagram](docs/secret-bootstrap-flow.md) for the sequence and where decryption occurs.
 
 ## CI/CD and platform infrastructure
 
@@ -92,3 +93,11 @@ The Docker-based test scripts honor `COMPOSE_NO_REBUILD_IN_TESTS=1`; CI sets it 
 For instructions covering local application unit tests, Docker smoke and integration tests, and Kubernetes manifest and cluster tests, see the [local testing guide](docs/local-testing.md).
 
 Platform infrastructure is managed separately in the `market-alerts-platform` repository.
+
+## Key technologies and implementation
+
+The FastAPI endpoint validates TradingView alerts and their shared secret, then publishes accepted alerts to a Redis stream. A separate worker consumes the stream and writes alerts to PostgreSQL, while the market-data fetcher retrieves candles with yfinance and stores them in the same database.
+
+- **Application services:** Pydantic validates webhook data; redis-py and Psycopg connect the API and worker to Redis and PostgreSQL.
+- **Local and cluster deployment:** Docker Compose runs the services locally. Kubernetes manifests use Kustomize overlays, with NetworkPolicies restricting service access, Sealed Secrets for application credentials, and KEDA to scale the worker from queue load and CPU.
+- **Checks in CI:** pytest covers API behavior and Docker-based tests exercise the worker and API-to-worker flow. Ruff runs linting, pip-audit does dependency audits, and Trivy image scans provide additional vulnerability checks.
