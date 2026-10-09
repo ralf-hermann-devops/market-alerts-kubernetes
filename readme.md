@@ -48,7 +48,7 @@ TradingView requires a publicly reachable HTTPS webhook URL; `localhost` and pri
 
 
 ## Running locally
-# Docker Compose
+### Docker Compose
 
 Docker Compose starts the API, worker, fetcher, Redis, and PostgreSQL:
 
@@ -59,7 +59,7 @@ docker compose -f Dockercompose.yaml up --build
 The API is available at `http://localhost:8000`. Local Compose credentials are for development only; do not use them in shared or production environments.
 
 
-# Kubernetes in minikube or kind
+### Kubernetes in minikube or kind
 
 The application is containerized and can also be deployed to a Kubernetes cluster. Kubernetes manifests are organized with Kustomize under `k8s/manifests/`, allowing shared configuration to be separated from environment-specific settings. A local cluster such as kind or Minikube can be used for testing, with cloud-specific configuration added when deploying to a platform such as Amazon EKS.
 
@@ -67,14 +67,18 @@ Before applying the Kubernetes manifests, build and load the application images 
 
 ```bash
 # Minikube
+# to see commandline options run
+# python k8s/bootstrapping/minikube_kind/minikube_build_and_load_images.py --help
 python k8s/bootstrapping/minikube_kind/minikube_build_and_load_images.py
 ```
+or 
 ```bash
-# kind (--name <cluster> supplies the name when creating a new cluster)
+# to see commandline options run
+# python k8s/bootstrapping/minikube_kind/kind_build_and_load_images.py --help
 python k8s/bootstrapping/minikube_kind/kind_build_and_load_images.py
 ```
 
-To bootstrap a cluster, make sure `kubectl` points at the target cluster and both `kubectl` and `kubeseal` are available. On Windows they both should be on `PATH`.
+To bootstrap a cluster, make sure `kubectl` points at the target cluster and both `kubectl` and `kubeseal` are available on your system's `PATH`.
 Then run:
 
 ```bash

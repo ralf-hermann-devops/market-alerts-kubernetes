@@ -42,9 +42,7 @@ These credentials are intentionally disposable and exist only to support local i
 
 ### Deployment in Kubernetes
 
-The `k8s/bootstrapping/bootstrap_kubernetes_resources.py` script installs the Sealed Secrets controller and waits for it to become available, then runs `k8s/bootstrapping/create_sealed_secret.py` to prompt for secret values and write the encrypted manifest at `k8s/manifests/base/apps/trading-alerts-sealedsecret.yaml`. Secret values can also be supplied using `--webhook-secret`, `--redis-password`, and `--postgres-password`; `--non-interactive` disables prompts and requires all three values. The bootstrap script also accepts `--overlay` to select an overlay without prompting; in non-interactive mode, it selects the only available overlay automatically or requires `--overlay` if there is more than one. In non-interactive mode, an existing output file is archived with a UTC timestamp in its name before the new manifest is written. Since command-line arguments may be visible in process listings and shell history, don't use this mechanism for sensitive values. The script requires `kubectl` connected to the target cluster and `kubeseal` on `PATH`.
-
-The sealed manifest is applied with the selected Kustomize overlay. In interactive mode, the generator asks before replacing an existing file; in non-interactive mode, it archives the existing file first.
+The sealed manifest is applied with the selected Kustomize overlay. A bootstrap script will be created to securely provide the cluster with the required secrets using Sealed Secrets.
 
 ## Further Considerations
 

@@ -2,45 +2,24 @@
 
 The bootstrap script installs the supporting infrastructure first, then creates the encrypted secret manifest and applies the selected application overlay. The diagram shows where secret values are handled and how workloads receive the resulting Kubernetes Secret.
 
-```mermaid
-flowchart TB
-    user["User: select overlay<br/>kubectl points to target cluster"]
-
-    subgraph bootstrap["1. Install prerequisites in target cluster"]
-        direction LR
-        infra["Apply KEDA and<br/>Sealed Secrets controller"]
-        crds["Wait for both<br/>CRDs to be established"]
-        controller["Wait for controller<br/>to become ready"]
-        infra --> crds --> controller
-    end
-
-    subgraph prepare["2. Create encrypted secret manifest on user's machine"]
-        direction LR
-        inputs["Enter webhook, Redis,<br/>and PostgreSQL secrets"]
-        cert["Fetch controller's<br/>public certificate"]
-        seal["Create temporary Secret YAML<br/>and seal with strict scope"]
-        manifest[("Encrypted SealedSecret<br/>manifest")]
-        inputs --> seal
-        cert --> seal --> manifest
-    end
-
-    subgraph deploy["3. Apply application resources to target cluster"]
-        direction LR
-        apply["Apply selected<br/>Kustomize overlay"]
-        reconcile["Controller decrypts<br/>the SealedSecret"]
-        secret[("Kubernetes Secret<br/>trading-alerts-secrets")]
-        workloads["Workloads read keys<br/>through secretKeyRef"]
-        apply --> reconcile --> secret --> workloads
-    end
-
-    user --> infra
-    controller --> cert
-    manifest --> apply
-
-    classDef sensitive fill:#fff2cc,stroke:#b8860b,color:#222
-    class inputs,seal sensitive
-```
-
 Only the encrypted `SealedSecret` manifest is suitable for storing in Git; do not commit plaintext values or the temporary Secret YAML. The Sealed Secrets public certificate is used to encrypt values and is not sufficient to decrypt them. Decryption uses the controller's private key in the target cluster.
 
-The bootstrap script selects the overlay before installing infrastructure, waits for both CRDs and for the controller deployment to become ready, generates the manifest, then applies the overlay. The default interactive mode prompts for values without echoing them. Non-interactive use requires all three values; avoid passing real credentials as command-line arguments because they may be exposed in shell history or process listings.
+> [!NOTE]
+> - The tools `kubectl` and `kubeseal` have to be installed and be available on your system's `PATH`.
+> - The script requires `kubectl` connected to the target cluster.  
+
+The `k8s/bootstrapping/bootstrap_kubernetes_resources.py` bootstrap script selects the overlay before installing infrastructure, and waits for both CRDs and for the controller deployment to become ready. It then runs `k8s/bootstrapping/create_sealed_secret.py` to prompt for secret values and write the encrypted manifest at `k8s/manifests/base/apps/trading-alerts-sealedsecret.yaml`. Secret values can also be supplied using `--webhook-secret`, `--redis-password`, and `--postgres-password` when calling either script. If only a subset of all secrets is passed the script will still prompt for the missing values. However `--non-interactive` disables prompts and requires all three values. 
+> [!IMPORTANT]
+>  - The `--non-interactive` mechanism is meant for CI usage and will ensure the script failing if not all necessary values are provided.
+> - `--non-interactive` will rename any preexisting sealed secret file with a UTC timestamp in its name before the new manifest is written.
+> - The bootstrap script accepts the same commandline options which are then passed passes on to the secret creation script.
+
+
+> [!WARNING]
+> Since command-line arguments may be visible in process listings and shell history, only use this mechanism for temporary dummy values or in non sensitive environments. 
+
+
+The bootstrap script also accepts `--overlay` to select an overlay without prompting. In non-interactive mode, it selects the only available overlay automatically or requires `--overlay` if there is more than one.
+
+
+![Architecture overview showing the local Docker Compose and Kubernetes deployments](kubernetes_secret_bootstrap_deployment.drawio.png)
