@@ -3,7 +3,6 @@ import sys
 import time
 from pathlib import Path
 
-
 NAMESPACE = "trading-alerts"
 DATABASE_POD = "postgres-0"
 DATABASE = "alerts"
@@ -16,12 +15,22 @@ POLL_INTERVAL_SECONDS = 2
 def kubectl(*args: str, capture_output: bool = False) -> str:
     command = ["kubectl", *args]
     print(f"$ {' '.join(command)}", flush=True)
-    result = subprocess.run(
-        command,
-        check=True,
-        capture_output=capture_output,
-        text=True,
-    )
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as error:
+        if error.stdout:
+            print("stdout:", file=sys.stderr)
+            print(error.stdout, end="", file=sys.stderr)
+        if error.stderr:
+            print("stderr:", file=sys.stderr)
+            print(error.stderr, end="", file=sys.stderr)
+        raise
+
+    if not capture_output:
+        if result.stdout:
+            print(result.stdout, end="")
+        if result.stderr:
+            print(result.stderr, end="", file=sys.stderr)
     return result.stdout.strip() if capture_output else ""
 
 
