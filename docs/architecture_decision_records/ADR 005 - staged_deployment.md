@@ -35,4 +35,5 @@ Build and validate the application in stages: Docker Compose for local container
 
 ## CI/CD
 - Introduce CI early, while development is still local. Run the existing automated tests and Docker Compose image builds on pull requests so changes are checked consistently before merging.
-- Add CD when EKS and its infrastructure, registry, and secret access are ready. Start with a gated or manually approved deployment; automate promotion further once deployments are repeatable and rollback procedures are understood.
+- Extend and adapt the local testing tools as automated CI testing and deployment grow. Keep them usable for manual testing on users' local machines, as originally intended. Automation should build on these tools rather than replace them or change their original purpose.
+- Add CD when EKS and its infrastructure, registry, and secret access are ready. Start with a gated or manually approved deployment. Automate promotion further once deployments are repeatable and rollback procedures are understood.

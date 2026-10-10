@@ -4,7 +4,7 @@
 
 Application credentials and other sensitive configuration must not be stored directly in Git. Kubernetes Secrets are only Base64-encoded by default and are not encrypted in the manifest. Committing plain Kubernetes Secrets to Git would therefore expose credentials to anyone with repository access.
 
-The local Docker Compose configuration contains development passwords because the images need temporary credentials to provision and run the services during local testing. These are throwaway values for local development and are not production credentials. For a late deployment in production in the cloud and proper testing of the whole system a safe solution is required.
+The local Docker Compose and CI Job "Kubernetes local deployment test" configuration contains development passwords because the images need temporary credentials to provision and run the services during local testing. These are throwaway values for local development and are not production credentials. For a late deployment in production in the cloud and proper testing of the whole system a safe solution is required.
 
 
 ## Decision
@@ -42,9 +42,7 @@ These credentials are intentionally disposable and exist only to support local i
 
 ### Deployment in Kubernetes
 
-The `k8s/bootstrapping.py` script installs the Sealed Secrets controller and waits for it to become available, then runs `k8s/create_sealed_secret.py` to prompt for secret values and write the encrypted manifest at `k8s/base/apps/trading-alerts-sealedsecret.yaml`. The script requires `kubectl` connected to the target cluster and `kubeseal` on `PATH`.
-
-The sealed manifest is applied with the selected Kustomize overlay. If it already exists, the generator asks before replacing it.
+The sealed manifest is applied with the selected Kustomize overlay. A bootstrap script will be created to securely provide the cluster with the required secrets using Sealed Secrets.
 
 ## Further Considerations
 

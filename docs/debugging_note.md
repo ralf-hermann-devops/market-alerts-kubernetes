@@ -47,10 +47,10 @@ While testing the API from a temporary Kubernetes Pod, Python `print()` output d
 **Debugging takeaway:** If output appears only after a container exits, check whether it is using buffered stdout before assuming the application is not producing logs.
 
 
-## 6. Making local Docker tests fail correctly in CI
+## 6. Ensuring local Docker tests to fail correctly in CI
 
 The Docker-based test scripts were first used locally, where logs where just looked at and decided whether the test passed. GitHub Actions does not evaluate those messages. It primarily determines success from each command's exit code. As a result, a script could print that a test failed but still exit with status `0`, causing CI to report success.
 
-**Solution:** Make each test outcome affect the process exit status while still allowing the script to print useful diagnostics and clean up its containers. The worker smoke test records whether processing succeeded, prints expected versus actual results and worker logs on failure, performs cleanup in a `finally` block, and returns `1` for failure or `0` for success. Its entry point uses `raise SystemExit(main())` so that returned status reaches the shell. The API-to-worker integration test raises an assertion when the HTTP response or persisted event is incorrect; its `finally` block still tears down the Compose project.
+**Solution:** Make each test outcome affect the process exit status while still allowing the script to print useful diagnostics and clean up its containers. The worker smoke test records whether processing succeeded, prints expected versus actual results and worker logs on failure, performs cleanup in a `finally` block, and returns `1` for failure or `0` for success. Its entry point uses `raise SystemExit(main())` so that returned status reaches the shell. The API-to-worker integration test raises an assertion when the HTTP response or persisted event is incorrect, its `finally` block still tears down the Compose project.
 
 **Debugging takeaway:** A failure message is for people (and supporting AI) to look at and evaluate what happened. A nonzero process exit status is what makes CI fail. Test scripts should report what went wrong and preserve cleanup, then return a failing status or let an exception propagate.

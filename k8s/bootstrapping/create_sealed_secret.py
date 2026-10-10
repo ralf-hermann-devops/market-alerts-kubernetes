@@ -6,21 +6,65 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Sequence
+from datetime import datetime, timezone
 from pathlib import Path
+
+from sealed_secrets_cli_args import SECRETS, create_parser, validate_secret_args
 
 
 """
 Because secrets should not be stored in git, someone will have to pass the value for 
-passwords and other secrets to the cluster manually. The script will prompt for the
-secret values encoded in base64 and create a SealedSecret manifest that can be applied
-to the cluster and is safe to store in git. The SealedSecret can only be decrypted by
-the Sealed Secrets controller running in the target cluster.
+passwords and other secrets to the cluster manually. The script accepts secret values
+as command-line arguments or prompts for any values not provided. It creates a
+SealedSecret manifest that can be applied to the cluster and safely stored in git.
+The SealedSecret can only be decrypted by the Sealed Secrets controller running in
+the target cluster.
 """
 
-def main() -> int:
+
+def collect_secret_values(provided_secrets: dict[str, str | None]) -> dict[str, str]:
+    """Map CLI secret values to manifest keys, prompting for missing values."""
+    secret_values: dict[str, str] = {}
+    for argument, key, prompt in SECRETS:
+        value = provided_secrets[argument]
+        if value is None:
+            while not (value := getpass.getpass(f"{prompt}: ")):
+                print("The value cannot be empty.")
+        secret_values[key] = value
+    return secret_values
+
+
+def archive_existing_output(output_path: Path) -> Path:
+    """Rename an existing manifest with a UTC timestamp and return its new path."""
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+    archived_path = output_path.with_name(
+        f"{output_path.stem}_retried_at_{timestamp}-{output_path.suffix}"
+    )
+    output_path.replace(archived_path)
+    return archived_path
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Write a sealed manifest; return zero on success or declined replacement.
+
+    Non-interactive mode archives an existing manifest before replacing it.
+    Handled command and file errors return a nonzero exit status.
+    """
+    parser = create_parser("Create a SealedSecret manifest.")
+    args = parser.parse_args(argv)
+    validate_secret_args(args, parser)
+    provided_secrets = {argument: getattr(args, argument) for argument, _, _ in SECRETS}
+
     script_path = Path(__file__).resolve()
-    k8s_dir = script_path.parent
-    output_path = k8s_dir / "base" / "apps" / "trading-alerts-sealedsecret.yaml"
+    k8s_dir = script_path.parent.parent
+    output_path = (
+        k8s_dir
+        / "manifests"
+        / "base"
+        / "apps"
+        / "trading-alerts-sealedsecret.yaml"
+    )
 
     for executable in ("kubectl", "kubeseal"):
         if shutil.which(executable) is None:
@@ -65,21 +109,13 @@ def main() -> int:
 
     # Check if the output file already exists and prompt the user for confirmation to replace it
     if output_path.exists():
-        answer = input(f"{output_path} already exists. Replace it? [y/N] ").strip().lower()
-        if answer not in {"y", "yes"}:
-            print("No file was changed.")
-            return 0
+        if not args.non_interactive:
+            answer = input(f"{output_path} already exists. Replace it? [y/N] ").strip().lower()
+            if answer not in {"y", "yes"}:
+                print("No file was changed.")
+                return 0
 
-    # Prompt the user for secret values, ensuring that they are not empty
-    secret_values: dict[str, str] = {}
-    for key, prompt in (
-        ("webhook-secret", "TradingView webhook secret: "),
-        ("redis-password", "Redis password: "),
-        ("postgres-password", "PostgreSQL password: "),
-    ):
-        while not (value := getpass.getpass(prompt)):   # dont show input in console
-            print("The value cannot be empty.")
-        secret_values[key] = value
+    secret_values = collect_secret_values(provided_secrets)
 
     # Encode the secret values in base64 and create a Kubernetes Secret manifest
     encoded_data = "\n".join(
@@ -155,9 +191,17 @@ def main() -> int:
             temporary_file.write(sealed_secret.stdout)
             temporary_path = Path(temporary_file.name)
 
+        if args.non_interactive and output_path.exists():
+            archived_path = archive_existing_output(output_path)
+            print(f"Existing SealedSecret archived at {archived_path}")
+
         temporary_path.replace(output_path)
     except OSError as error:
-        print(f"Could not write the SealedSecret file: {error}", file=sys.stderr)
+        print(
+            "Could not archive the existing or write the new SealedSecret file: "
+            f"{error}",
+            file=sys.stderr,
+        )
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)
         return 1

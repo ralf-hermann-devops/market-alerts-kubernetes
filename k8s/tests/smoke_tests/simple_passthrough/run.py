@@ -3,7 +3,6 @@ import sys
 import time
 from pathlib import Path
 
-
 NAMESPACE = "trading-alerts"
 DATABASE_POD = "postgres-0"
 DATABASE = "alerts"
@@ -14,28 +13,48 @@ POLL_INTERVAL_SECONDS = 2
 
 
 def kubectl(*args: str, capture_output: bool = False) -> str:
+    """Run kubectl, printing diagnostics and re-raising command failures.
+
+    Return stripped stdout when capturing; otherwise print output and return "".
+    """
     command = ["kubectl", *args]
     print(f"$ {' '.join(command)}", flush=True)
-    result = subprocess.run(
-        command,
-        check=True,
-        capture_output=capture_output,
-        text=True,
-    )
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as error:
+        if error.stdout:
+            print("stdout:", file=sys.stderr)
+            print(error.stdout, end="", file=sys.stderr)
+        if error.stderr:
+            print("stderr:", file=sys.stderr)
+            print(error.stderr, end="", file=sys.stderr)
+        raise
+
+    if not capture_output:
+        if result.stdout:
+            print(result.stdout, end="")
+        if result.stderr:
+            print(result.stderr, end="", file=sys.stderr)
     return result.stdout.strip() if capture_output else ""
 
 
 def alert_count() -> int:
+    """Query PostgreSQL through kubectl and return the number of stored alerts."""
     result = kubectl("exec", "-n", NAMESPACE, DATABASE_POD, "--", "psql", "-U", "app", "-d", DATABASE, "-tA",
                      "-c", "SELECT COUNT(*) FROM alerts;", capture_output=True)
     return int(result)
 
 
 def show_job_logs(job_name: str) -> None:
+    """Print logs for the named Job in the application namespace."""
     kubectl("logs", "-n", NAMESPACE, f"job/{job_name}")
 
 
 def main() -> int:
+    """Send a test webhook via a Job and check for a new database row.
+
+    Return zero when the row count increases, or a nonzero status on failure.
+    """
     try:
         # Record the baseline before sending the test alert.
         before_count = alert_count()
