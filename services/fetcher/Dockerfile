@@ -11,7 +11,7 @@ COPY requirements.txt .
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools \
     && python -m pip install --no-cache-dir -r requirements.txt
 # only copy app scripts and not the tests or other files
-COPY app/ ./
+COPY app/ ./app/
 RUN useradd -u 10001 app && chown -R app /app
 USER app
-CMD ["python", "-m", "scheduler"]
+CMD ["python", "-m", "app.scheduler"]
