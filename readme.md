@@ -92,9 +92,10 @@ See the [secret bootstrap and deployment diagram](docs/secret-bootstrap-flow.md)
 
 ## CI/CD and platform infrastructure
 
-The `application-ci.yml` workflow runs on pushes that change files under `services/`, `Dockercompose.yaml`, or the workflow itself. It runs Ruff over the Python services, audits each service's Python dependencies, builds and scans the API, worker, and fetcher images for HIGH and CRITICAL vulnerabilities, and runs the API unit tests plus the Docker-based worker smoke and API-to-worker integration tests.
+The `application-ci.yml` workflow runs on pushes and pull requests that change files under `services/`, `Dockercompose.yaml`, or the workflow itself. It runs Ruff over the Python services, audits each service's Python dependencies, builds and scans the API, worker, and fetcher images for HIGH and CRITICAL vulnerabilities, and runs the API unit tests plus the Docker-based worker smoke and API-to-worker integration tests.
 
-The Docker-based test scripts honor `COMPOSE_NO_REBUILD_IN_TESTS=1`. CI sets it so the tests reuse the service images built earlier in the test job. When run locally without that variable, the scripts build images as needed. The workflow does not run on pull requests, publish images, or deploy to Kubernetes.
+The Docker-based test scripts honor `COMPOSE_NO_REBUILD_IN_TESTS=1`. CI sets it so the tests reuse the service images built earlier in the test job. When run locally without that variable, the scripts build images as needed.
+
 
 For instructions covering local application unit tests, Docker smoke and integration tests, and Kubernetes manifest and cluster tests, see the [local testing guide](docs/local-testing.md).
 

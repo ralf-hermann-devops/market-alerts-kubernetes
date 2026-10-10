@@ -16,9 +16,6 @@ on:
       - "Dockercompose.yaml"
       - ".github/workflows/application-ci.yml"
 
-permissions:
-  contents: read
-
 env:
   SERVICE_IMAGES_ARTIFACT: service-images
 
@@ -26,8 +23,12 @@ jobs:
   application-lint:
     name: Application lint check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14.7"
@@ -43,8 +44,12 @@ jobs:
       fail-fast: false
       matrix:
         service: [api, worker, fetcher]
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14.7"
@@ -58,8 +63,12 @@ jobs:
   build-service-images:
     name: Build service images
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Build service images
         run: docker compose -f Dockercompose.yaml build --pull api worker fetcher
       - name: Save service images
@@ -80,8 +89,12 @@ jobs:
       fail-fast: false
       matrix:
         service: [api, worker, fetcher]
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Load service images
         uses: ./.github/actions/load-service-images
         with:
@@ -104,8 +117,12 @@ jobs:
     env:
       # tells tests not to rebuild images, but use the ones built in the previous step
       COMPOSE_NO_REBUILD_IN_TESTS: "1"
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14.7"
@@ -152,8 +169,12 @@ jobs:
           - target: infrastructure
             path: k8s/manifests/infrastructure
             kustomize_args: --enable-helm
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: azure/setup-helm@v4
         if: matrix.target == 'infrastructure'
         with:
@@ -186,6 +207,7 @@ jobs:
             -ignore-filename-pattern '(^|[\\/])kustomization\.yaml$' \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -strict \
             "${{ matrix.path }}"
 
       - name: Build assembled ${{ matrix.target }} manifests
@@ -209,6 +231,7 @@ jobs:
             -skip CustomResourceDefinition \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -strict \
             "$RUNNER_TEMP/combined.yaml"
 
 
@@ -219,8 +242,12 @@ jobs:
     name: Kubernetes local deployment test
     needs: [application-tests, kubernetes-manifests-validation]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
