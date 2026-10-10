@@ -31,6 +31,7 @@ class Alert(BaseModel):
     timeframe: str | None = None
 
 
+
 @app.post("/webhook/tradingview", status_code=202)
 def webhook(alert: Alert):
     if alert.secret != os.environ["WEBHOOK_SECRET"]:
