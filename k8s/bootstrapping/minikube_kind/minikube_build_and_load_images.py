@@ -14,6 +14,7 @@ from cluster_image_loading import (
 
 
 def get_profiles() -> list[str]:
+    """Return valid Minikube profile names, raising TypeError for an invalid schema."""
     profiles = json.loads(output(["minikube", "profile", "list", "-o", "json"]))
     if not isinstance(profiles, dict) or not isinstance(profiles.get("valid"), list):
         raise TypeError("Unexpected output from 'minikube profile list -o json'.")
@@ -27,6 +28,7 @@ def get_profiles() -> list[str]:
 
 
 def main() -> int:
+    """Parse CLI options, build and load Minikube images, and return an exit status."""
     parser = argparse.ArgumentParser(
         description="Build application images and load them into selected or new Minikube profiles."
     )
@@ -37,6 +39,7 @@ def main() -> int:
     args = parser.parse_args()
 
     def load() -> None:
+        """Select profiles, build images, and start each profile before loading images."""
         profiles = get_profiles()
         selected_profiles, _ = prompt_for_runs_cluster_name("Minikube", profiles, args.name)
         build_images()

@@ -11,6 +11,7 @@ SECRETS = (
 def create_parser(
     description: str = "Create a SealedSecret manifest.",
 ) -> argparse.ArgumentParser:
+    """Build a parser with shared secret options and a non-interactive flag."""
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--webhook-secret", help="TradingView webhook secret value")
     parser.add_argument("--redis-password", help="Redis password value")
@@ -26,6 +27,7 @@ def create_parser(
 def validate_secret_args(
     args: argparse.Namespace, parser: argparse.ArgumentParser
 ) -> None:
+    """Reject empty secrets and missing non-interactive values via parser.error."""
     provided_secrets = {argument: getattr(args, argument) for argument, _, _ in SECRETS}
     if any(provided_secrets[argument] == "" for argument, _, _ in SECRETS):
         parser.error("secret values cannot be empty")

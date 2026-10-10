@@ -12,6 +12,10 @@ POLL_INTERVAL_SECONDS = 2
 
 
 def kubectl(*args: str, capture_output: bool = False) -> str:
+    """Run kubectl, printing diagnostics and re-raising command failures.
+
+    Return stripped stdout when capturing; otherwise print output and return "".
+    """
     command = ["kubectl", *args]
     print(f"$ {' '.join(command)}", flush=True)
     try:
@@ -34,6 +38,7 @@ def kubectl(*args: str, capture_output: bool = False) -> str:
 
 
 def wait_for_workload(resource: str, name: str) -> None:
+    """Wait for a workload rollout, raising CalledProcessError if kubectl fails."""
     kubectl("rollout", "status", f"{resource}/{name}",
         "--namespace", NAMESPACE,
         f"--timeout={TIMEOUT_SECONDS}s",
@@ -41,6 +46,10 @@ def wait_for_workload(resource: str, name: str) -> None:
     print(f"{resource}/{name} is ready.")
 
 def main() -> int:
+    """Check configured Deployment and StatefulSet rollouts.
+
+    Return zero on success or 1 for handled errors; subprocess failures propagate.
+    """
     try:
         for deployment in DEPLOYMENTS:
             wait_for_workload("deployment", deployment)

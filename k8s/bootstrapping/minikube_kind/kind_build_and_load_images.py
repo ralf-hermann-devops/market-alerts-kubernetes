@@ -13,6 +13,7 @@ from cluster_image_loading import (
 
 
 def main() -> int:
+    """Parse CLI options, build and load kind images, and return an exit status."""
     parser = argparse.ArgumentParser(
         description="Build application images and load them into selected or new kind clusters."
     )
@@ -23,6 +24,7 @@ def main() -> int:
     args = parser.parse_args()
 
     def load() -> None:
+        """Select kind clusters, build images, and create clusters as needed to load them."""
         clusters = [
             cluster.strip()
             for cluster in output(["kind", "get", "clusters"]).splitlines()

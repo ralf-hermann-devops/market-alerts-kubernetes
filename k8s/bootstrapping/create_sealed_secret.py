@@ -24,6 +24,7 @@ the target cluster.
 
 
 def collect_secret_values(provided_secrets: dict[str, str | None]) -> dict[str, str]:
+    """Map CLI secret values to manifest keys, prompting for missing values."""
     secret_values: dict[str, str] = {}
     for argument, key, prompt in SECRETS:
         value = provided_secrets[argument]
@@ -35,6 +36,7 @@ def collect_secret_values(provided_secrets: dict[str, str | None]) -> dict[str, 
 
 
 def archive_existing_output(output_path: Path) -> Path:
+    """Rename an existing manifest with a UTC timestamp and return its new path."""
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
     archived_path = output_path.with_name(
         f"{output_path.stem}_retried_at_{timestamp}-{output_path.suffix}"
@@ -44,6 +46,11 @@ def archive_existing_output(output_path: Path) -> Path:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Write a sealed manifest; return zero on success or declined replacement.
+
+    Non-interactive mode archives an existing manifest before replacing it.
+    Handled command and file errors return a nonzero exit status.
+    """
     parser = create_parser("Create a SealedSecret manifest.")
     args = parser.parse_args(argv)
     validate_secret_args(args, parser)

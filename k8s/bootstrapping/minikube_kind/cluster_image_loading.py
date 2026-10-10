@@ -8,11 +8,13 @@ IMAGES = ("trading-api:dev", "trading-worker:dev", "trading-fetcher:dev")
 
 
 def run(command: list[str]) -> None:
+    """Run a command from the project root, raising CalledProcessError on failure."""
     print(f"$ {' '.join(command)}", flush=True)
     subprocess.run(command, cwd=PROJECT_ROOT, check=True)
 
 
 def output(command: list[str]) -> str:
+    """Run a command from the project root and return stdout, raising on failure."""
     print(f"$ {' '.join(command)}", flush=True)
     result = subprocess.run(
         command,
@@ -25,10 +27,12 @@ def output(command: list[str]) -> str:
 
 
 def build_images() -> None:
+    """Build the API, worker, and fetcher images using Docker Compose."""
     run(["docker", "compose", "-f", "Dockercompose.yaml", "build", "api", "worker", "fetcher"])
 
 
 def select_existing_clusters(platform: str, clusters: list[str]) -> list[str] | None:
+    """Prompt for cluster names; return None if none exist or selection is declined."""
     if not clusters:
         print(f"No existing {platform} clusters found.")
         return None
@@ -62,6 +66,10 @@ def select_existing_clusters(platform: str, clusters: list[str]) -> list[str] | 
 
 def prompt_for_runs_cluster_name(platform: str, clusters: list[str], name_hint: str | None) \
         -> tuple[list[str], bool]:
+    """Return selected cluster names and whether a new cluster must be created.
+
+    Offer existing clusters first, then use name_hint or prompt for a name.
+    """
     selected = select_existing_clusters(platform, clusters)
     if selected is not None:
         return selected, False
@@ -88,6 +96,11 @@ def prompt_for_runs_cluster_name(platform: str, clusters: list[str], name_hint: 
 
 
 def run_with_error_handling(action: Callable[[], None]) -> int:
+    """Run an action and return zero on success, reporting command failures.
+
+    Return 1 for a missing executable or the failed subprocess's exit code.
+    Other exceptions propagate to the caller.
+    """
     try:
         action()
     except FileNotFoundError as error:

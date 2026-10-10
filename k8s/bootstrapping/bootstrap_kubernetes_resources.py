@@ -28,6 +28,7 @@ KUSTOMIZATION_FILES = (
 
 
 def create_parser() -> argparse.ArgumentParser:
+    """Build the CLI parser for secret values and overlay selection."""
     parser = create_common_parser(
         "Bootstrap Kubernetes infrastructure and an application overlay."
     )
@@ -39,11 +40,13 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def run(*args):
+    """Print and run a command, raising CalledProcessError on failure."""
     print(f"$ {' '.join(args)}")
     subprocess.run(args, check=True)
 
 
 def wait_for_crd(crd, timeout=120):
+    """Wait up to timeout seconds for a CRD to become established."""
     print(f"Waiting for CRD {crd}...")
 
     run(
@@ -57,6 +60,7 @@ def wait_for_crd(crd, timeout=120):
 
 
 def find_overlays(overlays_dir):
+    """Return overlay paths sorted by name, or raise FileNotFoundError if absent."""
     if not overlays_dir.is_dir():
         raise FileNotFoundError(f"Overlay directory not found: {overlays_dir}")
 
@@ -77,6 +81,7 @@ def find_overlays(overlays_dir):
 
 
 def choose_overlay(overlays):
+    """Prompt for an overlay path, raising RuntimeError if selection is cancelled."""
     print("Available overlays:")
     for index, overlay in enumerate(overlays, start=1):
         print(f"  {index}. {overlay.name}")
@@ -102,6 +107,7 @@ def choose_overlay(overlays):
 
 
 def apply_infrastructure(infrastructure_dir):
+    """Render infrastructure with Helm and apply CRDs before other resources."""
     command = ["kubectl", "kustomize", "--enable-helm", str(infrastructure_dir)]
     print(f"$ {' '.join(command)}")
 
@@ -139,6 +145,7 @@ def apply_infrastructure(infrastructure_dir):
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    """Parse CLI options, install infrastructure, seal secrets, and deploy an overlay."""
     parser = create_parser()
     args = parser.parse_args(argv)
     validate_secret_args(args, parser)
