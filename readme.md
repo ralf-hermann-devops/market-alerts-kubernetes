@@ -26,10 +26,12 @@ You can [open the architecture image](docs/architecture_overview.png) to view it
 - `docs/` — project notes and architecture decision records.
     - See [`docs/architecture_decision_records/`](docs/architecture_decision_records/) for decisions about Redis, PostgreSQL, secrets, Kustomize, and staged deployment
     - See [`docs/debugging_note.md`](docs/debugging_note.md) for an overview of how errors encountered during development were investigated and addressed.
+    - [`docs/secret-bootstrap-flow.md`](docs/secret-bootstrap-flow.md) describes in detail how thet bootstraping of a Sealed Secrets works
+    - [`docs/local-testing.md`](docs/local-testing.md) describes how to run unit tests, Docker-based integration tests, and Kubernetes cluster tests.
 
 ## Sending TradingView webhook alerts
 
-Send an HTTP `POST` request to `/webhook/tradingview` with a JSON body. The `secret`, `symbol`, and `action` fields are required; `price` and `timeframe` are optional. Set the `secret` to the same value as the API's `WEBHOOK_SECRET`.
+Send an HTTP `POST` request to `/webhook/tradingview` with a JSON body. The `secret`, `symbol`, and `action` fields are required, `price` and `timeframe` are optional. Set the `secret` to the same value as the API's `WEBHOOK_SECRET`.
 
 ```json
 {
@@ -44,7 +46,7 @@ Send an HTTP `POST` request to `/webhook/tradingview` with a JSON body. The `sec
 
 In TradingView, configure the alert message as this JSON and use the webhook URL for the running API. Supported action examples include `long`, `short`, and `close`.
 
-TradingView requires a publicly reachable HTTPS webhook URL; `localhost` and private cluster services won't work. For Kubernetes, an Ingress needs a running Ingress controller and an externally reachable IP or load balancer, plus DNS and TLS configuration. The Ingress resource alone does not provide internet access. For local testing, use a secure tunnel such as Cloudflare Tunnel or ngrok. Keep `WEBHOOK_SECRET` private.
+TradingView requires a publicly reachable HTTPS webhook URL, `localhost` and private cluster services won't work. For Kubernetes, an Ingress needs a running Ingress controller and an externally reachable IP or load balancer, plus DNS and TLS configuration. The Ingress resource alone does not provide internet access. For local testing, use a secure tunnel such as Cloudflare Tunnel or ngrok. Keep `WEBHOOK_SECRET` private.
 
 
 ## Running locally
@@ -56,7 +58,7 @@ Docker Compose starts the API, worker, fetcher, Redis, and PostgreSQL:
 docker compose -f Dockercompose.yaml up --build
 ```
 
-The API is available at `http://localhost:8000`. Local Compose credentials are for development only; do not use them in shared or production environments.
+The API is available at `http://localhost:8000`. Local Compose credentials are for development only, do not use them in shared or production environments.
 
 
 ### Kubernetes in minikube or kind
@@ -92,7 +94,7 @@ See the [secret bootstrap and deployment diagram](docs/secret-bootstrap-flow.md)
 
 The `application-ci.yml` workflow runs on pushes that change files under `services/`, `Dockercompose.yaml`, or the workflow itself. It runs Ruff over the Python services, audits each service's Python dependencies, builds and scans the API, worker, and fetcher images for HIGH and CRITICAL vulnerabilities, and runs the API unit tests plus the Docker-based worker smoke and API-to-worker integration tests.
 
-The Docker-based test scripts honor `COMPOSE_NO_REBUILD_IN_TESTS=1`; CI sets it so the tests reuse the service images built earlier in the test job. When run locally without that variable, the scripts build images as needed. The workflow does not run on pull requests, publish images, or deploy to Kubernetes.
+The Docker-based test scripts honor `COMPOSE_NO_REBUILD_IN_TESTS=1`. CI sets it so the tests reuse the service images built earlier in the test job. When run locally without that variable, the scripts build images as needed. The workflow does not run on pull requests, publish images, or deploy to Kubernetes.
 
 For instructions covering local application unit tests, Docker smoke and integration tests, and Kubernetes manifest and cluster tests, see the [local testing guide](docs/local-testing.md).
 
@@ -102,6 +104,6 @@ Platform infrastructure is managed separately in the `market-alerts-platform` re
 
 The FastAPI endpoint validates TradingView alerts and their shared secret, then publishes accepted alerts to a Redis stream. A separate worker consumes the stream and writes alerts to PostgreSQL, while the market-data fetcher retrieves candles with yfinance and stores them in the same database.
 
-- **Application services:** Pydantic validates webhook data; redis-py and Psycopg connect the API and worker to Redis and PostgreSQL.
+- **Application services:** Pydantic validates webhook data, redis-py and Psycopg connect the API and worker to Redis and PostgreSQL.
 - **Local and cluster deployment:** Docker Compose runs the services locally. Kubernetes manifests use Kustomize overlays, with NetworkPolicies restricting service access, Sealed Secrets for application credentials, and KEDA to scale the worker from queue load and CPU.
 - **Checks in CI:** pytest covers API behavior and Docker-based tests exercise the worker and API-to-worker flow. Ruff runs linting, pip-audit does dependency audits, and Trivy image scans provide additional vulnerability checks.

@@ -9,6 +9,12 @@ on:
       - "k8s/**"
       - "Dockercompose.yaml"
       - ".github/workflows/application-ci.yml"
+  pull_request:
+    paths:
+      - "services/**"
+      - "k8s/**"
+      - "Dockercompose.yaml"
+      - ".github/workflows/application-ci.yml"
 
 permissions:
   contents: read

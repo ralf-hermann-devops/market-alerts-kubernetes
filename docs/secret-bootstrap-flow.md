@@ -2,7 +2,7 @@
 
 The bootstrap script installs the supporting infrastructure first, then creates the encrypted secret manifest and applies the selected application overlay. The diagram shows where secret values are handled and how workloads receive the resulting Kubernetes Secret.
 
-Only the encrypted `SealedSecret` manifest is suitable for storing in Git; do not commit plaintext values or the temporary Secret YAML. The Sealed Secrets public certificate is used to encrypt values and is not sufficient to decrypt them. Decryption uses the controller's private key in the target cluster.
+Only the encrypted `SealedSecret` manifest is suitable for storing in Git. Do not commit plaintext values or the temporary Secret YAML. The Sealed Secrets public certificate is used to encrypt values and is not sufficient to decrypt them. Decryption uses the controller's private key in the target cluster.
 
 > [!NOTE]
 > - The tools `kubectl` and `kubeseal` have to be installed and be available on your system's `PATH`.

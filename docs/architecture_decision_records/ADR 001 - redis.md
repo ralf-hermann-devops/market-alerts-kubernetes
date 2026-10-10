@@ -16,7 +16,7 @@ I will use Redis (Streams with consumer groups).
 
 ## Trade-offs
 
-- RabbitMQ has built-in dead-letter queues and retries; with Redis, I have to implement these in the worker myself.
+- RabbitMQ has built-in dead-letter queues and retries. With Redis I have to implement these in the worker myself.
 - RabbitMQ provides stronger delivery guarantees. Redis requires AOF, and about one second of data could still be lost in a failure. On the other hand, the application is not affected if some alerts go unprocessed.
 - RabbitMQ involves a few more concepts (exchanges and bindings) and uses more memory when idle. However, operating it with the Cluster Operator would not be much more complex.
 
