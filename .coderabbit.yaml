@@ -18,7 +18,6 @@ reviews:
   review_details: false
   collapse_walkthrough: true
   changed_files_summary: true
-  collapse_walkthrough: false
   path_instructions:
     - path: "services/api/app/**"
       instructions: >
