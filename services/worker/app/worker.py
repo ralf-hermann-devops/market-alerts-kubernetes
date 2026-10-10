@@ -25,6 +25,7 @@ r = redis.Redis(
     password=os.environ["REDIS_PASSWORD"],
     decode_responses=True,
 )
+
 stream_name = os.getenv("REDIS_STREAM", "alerts")
 group = os.getenv("REDIS_GROUP", "workers")
 consumer = socket.gethostname()   # pod name = unique consumer
