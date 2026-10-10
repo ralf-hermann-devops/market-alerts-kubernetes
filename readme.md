@@ -1,6 +1,8 @@
-# Trading Alerts
+# Market Alerts
 
 This project is a small, containerized backend for collecting and processing trading alerts and market data. A webhook API accepts TradingView alerts, validates a shared secret, and places valid alerts on a Redis stream. A worker consumes the stream and stores alerts in PostgreSQL. A separate fetcher retrieves market candle data and stores it in the same database.
+
+The services are packaged with Docker, and the project supports both local Kubernetes deployments with Minikube or kind and cloud deployments on AWS. The Terraform for AWS deployments is managed separately in the [`market-alerts-infrastructure`](https://github.com/ralf-hermann-devops/market-alerts-infrastructure) repository.
 
 ## General architecture
 
@@ -10,7 +12,6 @@ The same services can run locally with Docker Compose or be deployed to Kubernet
 
 ![Architecture overview showing the local Docker Compose and Kubernetes deployments](docs/architecture_overview.png)
 
-You can [open the architecture image](docs/architecture_overview.png) to view it larger.
 
 ## Project structure
 
@@ -21,7 +22,7 @@ You can [open the architecture image](docs/architecture_overview.png) to view it
     - `services/db/` — database initialization scripts.
 - `k8s/` — everything needed to deploy and test the application on Kubernetes
     - `k8s/manifests/` — Kustomize resources for Kubernetes applications, environment overlays, and supporting infrastructure.
-    - `k8s/bootstrapping/` — scripts to bootstrap a Kubernetes cluster with Sealed Secrets and create the encrypted manifest, plus image build-and-load helpers for Minikube and kind.
+    - [`k8s/bootstrapping/`](k8s/bootstrapping/) — scripts to bootstrap a Kubernetes cluster with Sealed Secrets and create the encrypted manifest, plus image build-and-load helpers for Minikube and kind.
     - `k8s/tests/` — tests to exercise the application in a deployed Kubernetes cluster.
 - `docs/` — project notes and architecture decision records.
     - See [`docs/architecture_decision_records/`](docs/architecture_decision_records/) for decisions about Redis, PostgreSQL, secrets, Kustomize, and staged deployment
@@ -99,7 +100,6 @@ The Docker-based test scripts honor `COMPOSE_NO_REBUILD_IN_TESTS=1`. CI sets it 
 
 For instructions covering local application unit tests, Docker smoke and integration tests, and Kubernetes manifest and cluster tests, see the [local testing guide](docs/local-testing.md).
 
-Platform infrastructure is managed separately in the `market-alerts-platform` repository.
 
 ## Key technologies and implementation
 

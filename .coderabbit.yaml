@@ -1,0 +1,78 @@
+# .coderabbit.yaml
+language: en
+tone_instructions: "Be concise and direct. Focus on bugs and security issues.
+  Skip stylistic suggestions unless they impact readability significantly."
+early_access: false
+
+reviews:
+  profile: assertive
+  allow_author_approval: true
+  request_changes_workflow: false
+  high_level_summary_in_walkthrough: true
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+  auto_title_instructions: "Use \"target -> base | \" to start the title"
+  poem: false
+  in_progress_fortune: true
+  review_status: true
+  review_details: false
+  collapse_walkthrough: true
+  changed_files_summary: true
+  collapse_walkthrough: false
+  path_instructions:
+    - path: "services/api/app/**"
+      instructions: >
+        Review webhook authentication and secret handling, request validation,
+        Redis stream publishing, and HTTP error behavior. Check that secrets are
+        never logged or exposed in responses. Report rate-limiting concerns only
+        when a change affects abuse protection; do not require unrelated features.
+    - path: "services/worker/app/**"
+      instructions: >
+        Review Redis stream consumption and acknowledgement behavior, safe
+        handling of malformed or duplicate messages, and PostgreSQL persistence.
+        Check that failures do not silently lose alerts or cause unintended
+        duplicate writes.
+    - path: "services/fetcher/app/**"
+      instructions: >
+        Review market-data retrieval, handling of unavailable or malformed
+        provider data, and PostgreSQL persistence. Check scheduling and failure
+        behavior for unintended data loss or duplicate records.
+    - path: "k8s/manifests/**"
+      instructions: >
+        Review Kustomize composition and Kubernetes resource correctness.
+        Pay particular attention to secret references (never plaintext secrets),
+        namespace and selector consistency, probes, resource settings, network
+        policies, ingress exposure, and KEDA scaling configuration.
+    - path: "k8s/bootstrapping/**"
+      instructions: >
+        Review cluster targeting and bootstrap ordering, subprocess failure
+        handling, and temporary-file cleanup. Ensure secret values are not
+        logged, persisted as plaintext, or exposed unnecessarily through
+        command-line arguments.
+    - path: "services/**/tests/**"
+      instructions: >
+        Focus on whether changes leave important behavior or failure cases
+        untested, especially webhook-to-worker persistence and Kubernetes
+        readiness. Do not flag test style or request tests unrelated to the
+        change.
+    - path: ".github/workflows/**"
+      instructions: >
+        Review trigger and path-filter behavior, least-privilege token
+        permissions, safe handling of untrusted pull-request code, and whether
+        validation steps actually cover the changed application and Kubernetes
+        resources. Do not suggest publishing or deployment steps unless required
+        by the change.
+    - path: "docs/**"
+      instructions: >
+        Check that documentation changes match the current service and
+        Kubernetes behavior, use the repository's actual paths and commands,
+        and do not disclose real credentials or other secrets.
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_incremental_review: true
+    base_branches:
+      - .*
+
+chat:
+  auto_reply: true
