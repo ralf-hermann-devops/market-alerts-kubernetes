@@ -34,9 +34,3 @@ spec:
                     name: app-config
                 - configMapRef:
                     name: fetcher-config
-              env:
-                - name: POSTGRES_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: trading-alerts-secrets
-                      key: postgres-password

@@ -161,8 +161,8 @@ jobs:
           - target: base
             path: k8s/manifests/base
             kustomize_args: ""
-          - target: dev
-            path: k8s/manifests/overlays/dev
+          - target: on-premise
+            path: k8s/manifests/overlays/on-premise
             kustomize_args: ""
           # external infrastructure overlays are checked with --enable-helm for kustomize
           # due to keda getting installed with it.
@@ -281,7 +281,7 @@ jobs:
             --name app-test
 
       - name: Run bootstrapping script to deploy services to kind cluster
-        run: python k8s/bootstrapping/bootstrap_kubernetes_resources.py --webhook-secret "dummyWebhookSecret" --redis-password "dummyRedisPassword" --postgres-password "dummyPostgresPassword" --non-interactive --overlay dev
+        run: python k8s/bootstrapping/bootstrap_kubernetes_resources.py --webhook-secret "dummyWebhookSecret" --redis-password "dummyRedisPassword" --postgres-password "dummyPostgresPassword" --non-interactive --overlay on-premise
 
       - name: Workload Controllers started test
         run: python k8s/tests/smoke_tests/workload_controllers_started/run.py

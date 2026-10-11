@@ -23,17 +23,6 @@ spec:
           envFrom:
             - configMapRef:
                 name: app-config
-          env:
-            - name: WEBHOOK_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: trading-alerts-secrets
-                  key: webhook-secret
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: trading-alerts-secrets
-                  key: redis-password
           readinessProbe: # 30s to unready
             httpGet:
               path: /readyz

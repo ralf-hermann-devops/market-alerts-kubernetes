@@ -18,18 +18,6 @@ spec:
           envFrom:
             - configMapRef:
                 name: app-config
-          env:
-            # worker needs to know the redis and postgres passwords
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: trading-alerts-secrets
-                  key: redis-password
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: trading-alerts-secrets
-                  key: postgres-password
           # add a way to test for readiness and liveness probes
           resources:
             requests:

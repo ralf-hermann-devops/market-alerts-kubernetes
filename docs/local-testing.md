@@ -29,7 +29,7 @@ The API smoke test checks health, readiness, and valid and invalid webhooks. The
 If you do not need to validate the manifests separately, you can deploy the infrastructure and selected application overlay directly with the bootstrap script described in the [Kubernetes section of the README](../readme.md#kubernetes-in-minikube-or-kind).
 
 ### Build Kustomize targets
-Before validating the base and dev overlay, deploy the infrastructure components to the cluster. Render the KEDA chart with Helm and apply the infrastructure manifests:
+Before validating the base and on-premise overlay, deploy the infrastructure components to the cluster. Render the KEDA chart with Helm and apply the infrastructure manifests:
 
 ```bash
 kubectl kustomize --enable-helm k8s/manifests/infrastructure | kubectl apply -f -
@@ -38,7 +38,7 @@ kubectl wait --for=condition=Established crd/sealedsecrets.bitnami.com --timeout
 kubectl rollout status deployment/sealed-secrets-controller --namespace kube-system --timeout=120s
 ```
 
-Once the Sealed Secrets controller is ready, generate a SealedSecret using disposable test credentials. This writes the manifest required by the base and dev overlay:
+Once the Sealed Secrets controller is ready, generate a SealedSecret using disposable test credentials. This writes the manifest required by the on-premise overlay:
 
 ```bash
 python k8s/bootstrapping/create_sealed_secret.py --webhook-secret test-webhook-secret --redis-password test-redis-password --postgres-password test-postgres-password --non-interactive
@@ -52,10 +52,10 @@ Now build each Kustomize target to catch composition and rendering errors (and o
 
 ```bash
 kubectl kustomize k8s/manifests/base    # | kubectl apply -f -
-kubectl kustomize k8s/manifests/overlays/dev # | kubectl apply -f -
+kubectl kustomize k8s/manifests/overlays/on-premise # | kubectl apply -f -
 ```
 
-To test against a running local minikube or kind cluster, make sure `kubectl` targets that cluster and the required tools are installed (`kubectl`, `kubeseal`, and Helm). Use the appropriate image build-and-load helper and bootstrap steps in the [Kubernetes section of the README](../readme.md#kubernetes-in-minikube-or-kind). Once the `dev` overlay is deployed and the API, worker, and PostgreSQL are ready, run the Kubernetes smoke test:
+To test against a running local minikube or kind cluster, make sure `kubectl` targets that cluster and the required tools are installed (`kubectl`, `kubeseal`, and Helm). Use the appropriate image build-and-load helper and bootstrap steps in the [Kubernetes section of the README](../readme.md#kubernetes-in-minikube-or-kind). Once the `on-premise` overlay is deployed and the API, worker, and PostgreSQL are ready, run the Kubernetes smoke test:
 
 ## Run tests on the active cluster
 
@@ -65,7 +65,7 @@ To check that all workload controllers can start run:
 python k8s/tests/smoke_tests/workload_controllers_started/run.py
 ```
 
-This waits for the API, worker, Redis, and PostgreSQL workloads to become ready. The check requires the `dev` overlay and the `trading-alerts` namespace to be deployed.
+This waits for the API, worker, Redis, and PostgreSQL workloads to become ready. The check requires the `on-premise` overlay and the `trading-alerts` namespace to be deployed.
 
 
 

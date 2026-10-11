@@ -25,11 +25,6 @@ spec:
             - configMapRef:
                 name: app-config
           env:
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: trading-alerts-secrets
-                  key: postgres-password
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
           volumeMounts:

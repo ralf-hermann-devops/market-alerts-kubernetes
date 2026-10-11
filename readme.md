@@ -76,6 +76,7 @@ python k8s/bootstrapping/minikube_kind/minikube_build_and_load_images.py
 ```
 or 
 ```bash
+# kind
 # to see commandline options run
 # python k8s/bootstrapping/minikube_kind/kind_build_and_load_images.py --help
 python k8s/bootstrapping/minikube_kind/kind_build_and_load_images.py
