@@ -158,17 +158,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: base
-            path: k8s/manifests/base
-            kustomize_args: ""
-          - target: on-premise
-            path: k8s/manifests/overlays/on-premise
-            kustomize_args: ""
           # external infrastructure overlays are checked with --enable-helm for kustomize
           # due to keda getting installed with it.
           - target: infrastructure
             path: k8s/manifests/infrastructure
             kustomize_args: --enable-helm
+          - target: base
+            path: k8s/manifests/base
+            kustomize_args: ""
+          - target: sealed-secrets
+            path: k8s/manifests/overlays/on-premise/sealed-secrets
+          - target: on-premise
+            path: k8s/manifests/overlays/on-premise
+            kustomize_args: ""
+
+          
     permissions:
       contents: read
     steps:
@@ -199,12 +203,18 @@ jobs:
         # This reports schema problems in source manifests before transformations are applied.
         # This makes it easier to identify and fix issues across the target saves
         # the responsible developer time in fixing them all at once instead of one by one.
+        # ---
+        # Kustomization.yaml files would be investigated by kubeconform, but since they don't
+        # adhere to any schemes checking them should be skipped.
+        # The same goes for kustomization patches. They alone are not valid ressource definitions
+        # so they also should be excluded from individual validation. Their effect will be 
+        # checked when the final combined manifest is validated.
         run: |
           kubeconform \
             -summary \
             -output pretty \
             -skip CustomResourceDefinition \
-            -ignore-filename-pattern '(^|[\\/])kustomization\.yaml$' \
+            -ignore-filename-pattern '(?i)(^|[\\/])([^\\/]*patch[^\\/]*|kustomization\.yaml)$' \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             -strict \
