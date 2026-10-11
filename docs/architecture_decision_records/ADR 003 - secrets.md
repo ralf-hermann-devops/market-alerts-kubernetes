@@ -10,23 +10,44 @@ The local Docker Compose and CI Job "Kubernetes local deployment test" configura
 ## Decision
 
 Use Sealed Secrets for Kubernetes secrets from the start.
+- Sealed Secrets are selected for easily GitOps-managed manifests without requiring a separate secrets platform.
+- Sensitive values are encrypted before being committed to Git. The Sealed Secrets controller in the cluster decrypts the values at deployment time.
 
-- Sensitive values are encrypted before being committed to Git.
-- The Kubernetes cluster decrypts the values at deployment time using the Sealed Secrets controller.
+<br/>
+
+>> [!NOTE]
+>> Sealed Secrets require access to the matching sealing key to decrypt manifests. Losing it can prevent recovery of the encrypted values.
+
+<br/>
+
 
 ## Rationale
 
-Sealed Secrets provide a simple GitOps-compatible workflow while keeping encrypted secret manifests alongside the application configuration.
 
-This is preferable to relying on standard Kubernetes Secrets in Git, even when the repository is private. It establishes the correct separation between configuration that belongs in version control and credentials that should remain protected.
 
-For environments that already provide a dedicated secrets manager, such as AWS Secrets Manager, External Secrets can be considered instead.
+
+
+
+| Consideration | Plaintext Secret | Sealed Secret | Secret Store CSI Driver | HashiCorp Vault |
+| ------------ | ----------- | ------------ | ---------------------- | --------------- |
+| Safe to store in Git | ❌ **No**<br/>Base64 is not encryption. | ✅ **Yes**<br/>Values are encrypted before commit. | ✅ **Yes**<br/>Secret values remain in the external store. | ✅ **Yes**<br/>Secret values remain in Vault. |
+| GitOps workflow | ⚠️ **Poor**<br/>fit; committing values exposes them to repository readers. | ✅ **Strong**<br/>fit; encrypted manifests can be versioned and deployed with the application configuration. | ✅ **Good**<br/>fit; Git can hold references and CSI configuration, not the secret values. | ✅ **Good**<br/>fit; Git can hold Vault integration configuration, not the secret values. |
+| Setup requirements | ✅ **None**<br/>beyond Kubernetes. | ⚠️ **Install**<br/>the controller and provision its sealing key. | ⚠️ **Higher**<br/> Configure an external store and a compatible CSI provider. | ⚠️ **Highest**<br/> Set up a Vault service & configure Kubernetes authentication, and access policies. |
+| Cloud integration | ❌ **Not**<br/>applicable. | ✅ **Cloud-provider**<br/>agnostic. | ⚠️ **Depends**<br/>on the provider; commonly cloud-specific. | ✅ **Cloud-provider**<br/>agnostic. |
+| Operational complexity | ✅ **Low**<br/>but insecure. | ⚠️ **Moderate**<br/>maintain controller availability and sealing-key backups/rotation. | ⚠️ **Higher**<br/>maintain provider availability and runtime secret synchronization. | ⚠️ **Higher**<br/>operate Vault and maintain its availability and upgrades. |
+| Unique advantage | **Native**<br/>Supported directly by Kubernetes. | **GitOps**<br/>Encrypted manifests can be versioned alongside application configuration. | **Rotation** <br/> Mounted values can refresh automatically when the source changes, if rotation is enabled and supported by the provider and consuming application. | **Dynamic**<br/>Can issue short-lived credentials on demand. |
+| Best<br/>fit | ⚠️ <br/> Temporary local or throwaway test credentials. | 1️⃣<br/> Kubernetes deployments that need encrypted, GitOps-managed secret manifests without a separate secrets platform. | 2️⃣<br/> Environments already using a managed external secrets service. | Organizations needing centralized, portable secret management or dynamic credentials. |
+
+---
+
+<br/>
 
 ## Trade-offs
 
-- Sealed Secrets introduce a controller and key management requirement in the cluster.
+- If regular secret rotation and native AWS integration are needed, the Secrets Store CSI Driver can retrieve secrets from AWS Secrets Manager and refresh mounted values when the source changes. Applications have to support get secrets from mounte files and refresh them on change.
+- HashiCorp Vault offers many capabilities, including dynamic credentials and portability across cloud providers, but its broader feature set and operational requirements are beyond the scope of this project.
 
-- External Secrets Managers add complexity and relly on a connection to Cloud ressources
+
 
 ## Implementation
 
@@ -44,6 +65,8 @@ These credentials are intentionally disposable and exist only to support local i
 
 The sealed manifest is applied with the selected Kustomize overlay. A bootstrap script will be created to securely provide the cluster with the required secrets using Sealed Secrets.
 
+<br/>
+
 ## Further Considerations
 
 - Application logs must never print raw secrets, tokens, connection strings, database credentials, or request payloads that include sensitive values. Logging and alerting should use redaction and structured sanitization by default.
@@ -51,4 +74,4 @@ The sealed manifest is applied with the selected Kustomize overlay. A bootstrap 
 
 ## When to Revisit This Decision
 
-Consider External Secrets when a managed secrets service such as AWS Secrets Manager becomes the central source of truth across multiple environments or applications.
+For the planned AWS cloud deployment, consider replacing Sealed Secrets with the Secrets Store CSI Driver integrated with AWS Secrets Manager. Keep Sealed Secrets as the secret-management approach for on-premises deployments.
