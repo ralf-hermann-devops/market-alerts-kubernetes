@@ -167,7 +167,7 @@ jobs:
             path: k8s/manifests/base
             kustomize_args: ""
           - target: sealed-secrets
-            path: k8s/manifests/overlays/on-premise/sealed-secrets
+            path: k8s/manifests/overlays/on-premise/sealed_secrets
           - target: on-premise
             path: k8s/manifests/overlays/on-premise
             kustomize_args: ""
