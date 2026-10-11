@@ -15,8 +15,8 @@ Use Sealed Secrets for Kubernetes secrets from the start.
 
 <br/>
 
->> [!NOTE]
->> Sealed Secrets require access to the matching sealing key to decrypt manifests. Losing it can prevent recovery of the encrypted values.
+> [!NOTE]
+> Sealed Secrets require access to the matching sealing key to decrypt manifests. Losing it can prevent recovery of the encrypted values.
 
 <br/>
 
@@ -35,8 +35,8 @@ Use Sealed Secrets for Kubernetes secrets from the start.
 | Setup requirements | ✅ **None**<br/>beyond Kubernetes. | ⚠️ **Install**<br/>the controller and provision its sealing key. | ⚠️ **Higher**<br/> Configure an external store and a compatible CSI provider. | ⚠️ **Highest**<br/> Set up a Vault service & configure Kubernetes authentication, and access policies. |
 | Cloud integration | ❌ **Not**<br/>applicable. | ✅ **Cloud-provider**<br/>agnostic. | ⚠️ **Depends**<br/>on the provider; commonly cloud-specific. | ✅ **Cloud-provider**<br/>agnostic. |
 | Operational complexity | ✅ **Low**<br/>but insecure. | ⚠️ **Moderate**<br/>maintain controller availability and sealing-key backups/rotation. | ⚠️ **Higher**<br/>maintain provider availability and runtime secret synchronization. | ⚠️ **Higher**<br/>operate Vault and maintain its availability and upgrades. |
-| Unique advantage | **Native**<br/>Supported directly by Kubernetes. | **GitOps**<br/>Encrypted manifests can be versioned alongside application configuration. | **Rotation** <br/> Mounted values can refresh automatically when the source changes, if rotation is enabled and supported by the provider and consuming application. | **Dynamic**<br/>Can issue short-lived credentials on demand. |
-| Best<br/>fit | ⚠️ <br/> Temporary local or throwaway test credentials. | 1️⃣<br/> Kubernetes deployments that need encrypted, GitOps-managed secret manifests without a separate secrets platform. | 2️⃣<br/> Environments already using a managed external secrets service. | Organizations needing centralized, portable secret management or dynamic credentials. |
+| Unique advantage | **Native**<br/>Supported directly by Kubernetes. | **GitOps**<br/>Encrypted manifests can be versioned alongside application configuration. | **Rotation** <br/> Mounted values can refresh automatically<br/><br/> **Reduced attack surface** <br/> Secret values aren't stored in an additional `Secret` Object but injected directly into pods | **Dynamic**<br/>Can issue short-lived credentials on demand.<br/><br/> **Policies**<br/>Fine-grained access policies control which identities can access secrets. |
+| Best fit | ⚠️ <br/> Temporary local or throwaway test credentials. | 1️⃣<br/> Kubernetes deployments that need encrypted, GitOps-managed secret manifests without a separate secrets platform. | 2️⃣<br/> Environments already using a managed external secrets service. | Organizations needing centralized, portable secret management or dynamic credentials. |
 
 ---
 
