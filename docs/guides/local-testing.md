@@ -134,7 +134,7 @@ kubectl apply -f on-premise.yaml
 
 ## Run tests on the active cluster
 
-To test against a running local minikube or kind cluster, make sure `kubectl` targets that cluster and the required tools are installed (`kubectl`, `kubeseal`, and Helm). Use the appropriate image build-and-load helper and bootstrap steps in the [Kubernetes section of the README](../../README.md#kubernetes-in-minikube-or-kind). Once the `on-premise` overlay is deployed and the API, worker, and PostgreSQL are ready, run the Kubernetes smoke test.
+To test against a running local minikube or kind cluster, make sure `kubectl` targets that cluster and the required tools are installed (`kubectl`, `kubeseal`, and Helm). Use the appropriate image build-and-load helper and bootstrap steps in the [Kubernetes section of the README](../../readme.md#kubernetes-in-minikube-or-kind). Once the `on-premise` overlay is deployed and the API, worker, and PostgreSQL are ready, run the Kubernetes smoke test.
 
 To check that all workload controllers can start run:
 
