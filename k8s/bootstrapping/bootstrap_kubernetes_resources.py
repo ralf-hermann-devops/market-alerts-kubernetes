@@ -188,7 +188,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     # The on-premise overlay needs the sealed-secrets controller to be installed first
     # so the bootstrap script can create the sealed secret for the overlay.
     if selected_overlay.name == "on-premise":
-        apply_infrastructure(selected_overlay / "sealed_secrets")
+        apply_infrastructure(selected_overlay / "sealed_secrets_install")
 
         # Wait until the controller can serve its public certificate to kubeseal.
         wait_for_crd("sealedsecrets.bitnami.com")

@@ -57,7 +57,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     provided_secrets = {argument: getattr(args, argument) for argument, _, _ in SECRETS}
 
     script_path = Path(__file__).resolve()
-    k8s_dir = script_path.parents[2]
+    k8s_dir = script_path.parents[1]
     output_path = (
         k8s_dir
         / "manifests"
