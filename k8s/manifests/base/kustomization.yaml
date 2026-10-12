@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - apps/app-config.yaml
+  - service-accounts.yaml
   
   - apps/api
   - apps/fetcher
