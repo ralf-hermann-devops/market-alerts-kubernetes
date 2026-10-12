@@ -141,25 +141,13 @@ jobs:
 
 
   kubernetes-manifests-validation:
-    # Run a lint check on each kustomize overlay, the base and external infrastructure
-    # It checks for all manifest files for wrong value types, invalid field values,
-    # or missing fields the schema marks as required.
-    # With -strict, it also catches unknown fields and duplicate YAML keys.
-    # Kubeconform doesn't assemble Kustomize resources or check whether the original
-    # manifests, patches and generators build correctly, so kubectl kustomize is run 
-    # separately to build the final YAML for validation.
-
-    # Base is checked independently of overlays, because overlays may not include
-    # all base manifests and base should be ok on its own without overlays
-    # The external infrastructure overlay is checked in case manual changes are made to it
+    # Detailed validation documentation: docs/engineering_notes/kubernetes-manifest-validation.md
     name: Kubernetes manifests validation
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          # external infrastructure overlays are checked with --enable-helm for kustomize
-          # due to keda getting installed with it.
           - target: infrastructure
             path: k8s/manifests/infrastructure
             kustomize_args: --enable-helm
@@ -182,11 +170,7 @@ jobs:
         with:
           version: v3.17.3
       
-      # General note on kubeconform usage:
-      # External CRs are validated using the additional scheme location's CRD catalog
-      # on the additionally linked GitHub repository.
-      # Additionally kubeconform needs -skip CustomResourceDefinition so it doesn't
-      # try to check CRDs themselves which don't have a scheme available
+      # External CR schemas and CRD exclusions are documented in the engineering note.
       - name: Install kubeconform
         run: |
           KUBECONFORM_VERSION=0.8.0
@@ -196,17 +180,8 @@ jobs:
           sudo install "$RUNNER_TEMP/kubeconform" /usr/local/bin/kubeconform
           kubeconform -v
 
+      # Scan source resources individually; skip Kustomize-only files.
       - name: Scan individual ${{ matrix.target }} manifests
-        # First scan all individual manifests in the target directory.
-        # This reports schema problems in source manifests before transformations are applied.
-        # This makes it easier to identify and fix issues across the target saves
-        # the responsible developer time in fixing them all at once instead of one by one.
-        # ---
-        # Kustomization.yaml files would be investigated by kubeconform, but since they don't
-        # adhere to any schemes checking them should be skipped.
-        # The same goes for kustomization patches. They alone are not valid ressource definitions
-        # so they also should be excluded from individual validation. Their effect will be 
-        # checked when the final combined manifest is validated.
         run: |
           kubeconform \
             -summary \
@@ -218,20 +193,16 @@ jobs:
             -strict \
             "${{ matrix.path }}"
 
+      # Build catches Kustomize composition errors that schema scans cannot detect.
       - name: Build assembled ${{ matrix.target }} manifests
-        # This build catches composition errors that kubeconform's schema checks don't look for,
-        # such as invalid resource references, patch targets, or Helm rendering failures.
-        # It also produces the final output for kubeconform to validate below.
         run: |
           kubectl kustomize \
             "${{ matrix.path }}" \
             ${{ matrix.kustomize_args }} \
             > "$RUNNER_TEMP/combined.yaml"
           
+      # Validate the assembled output, including patches, generators, and transformations.
       - name: Scan combined ${{ matrix.target }} manifests
-        # kubeconform runs again, this time on the combined manifest
-        # This explicitly checks what kustomize will actually produce including:
-        # the effects of patches, generators, and transformations.
         run: |
           kubeconform \
             -summary \

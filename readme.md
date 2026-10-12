@@ -10,7 +10,7 @@ TradingView sends alerts to the API, which validates each alert's shared secret 
 
 The same services can run locally with Docker Compose or be deployed to Kubernetes. In Kubernetes, ingress routes webhook requests to the API, network policies constrain service access to Redis and PostgreSQL, and KEDA scales the worker based on Redis stream lag and CPU utilization.
 
-![Architecture overview showing the local Docker Compose and Kubernetes deployments](docs/architecture_overview.png)
+![Architecture overview showing the local Docker Compose and Kubernetes deployments](docs/images/architecture_overview.png)
 
 
 ## Project structure
@@ -26,9 +26,11 @@ The same services can run locally with Docker Compose or be deployed to Kubernet
     - `k8s/tests/` — tests to exercise the application in a deployed Kubernetes cluster.
 - `docs/` — project notes and architecture decision records.
     - See [`docs/architecture_decision_records/`](docs/architecture_decision_records/) for decisions about Redis, PostgreSQL, secrets, Kustomize, and staged deployment
+    - See [`docs/engineering_notes/`](docs/engineering_notes/) for further engineering notes on implementation and operational topics that do not have an architectural impact.
     - See [`docs/debugging_note.md`](docs/debugging_note.md) for an overview of how errors encountered during development were investigated and addressed.
-    - [`docs/secret-bootstrap-flow.md`](docs/secret-bootstrap-flow.md) describes in detail how thet bootstraping of a Sealed Secrets works
-    - [`docs/local-testing.md`](docs/local-testing.md) describes how to run unit tests, Docker-based integration tests, and Kubernetes cluster tests.
+    - `docs/guides/` — contains guides and deep dives about certain aspects of the repository, including:
+        - [`docs/guides/secret-bootstrap-flow.md`](docs/guides/secret-bootstrap-flow.md) — describes in detail how thet bootstraping of a Sealed Secrets works
+        - [`docs/guides/local-testing.md`](docs/guides/local-testing.md) — describes how to run unit tests, Docker-based integration tests, and Kubernetes cluster tests.
 
 ## Sending TradingView webhook alerts
 
@@ -90,7 +92,7 @@ python k8s/bootstrapping/bootstrap_kubernetes_resources.py
 ```
 
 The bootstrap script installs the Sealed Secrets controller, prompts for the application secret values, writes the encrypted SealedSecret manifest, and applies the selected overlay.
-See the [secret bootstrap and deployment diagram](docs/secret-bootstrap-flow.md) for the sequence and where decryption occurs.
+See the [secret bootstrap and deployment diagram](docs/guides/secret-bootstrap-flow.md) for the sequence and where decryption occurs.
 
 ## CI/CD and platform infrastructure
 
@@ -99,7 +101,7 @@ The `application-ci.yml` workflow runs on pushes and pull requests that change f
 The Docker-based test scripts honor `COMPOSE_NO_REBUILD_IN_TESTS=1`. CI sets it so the tests reuse the service images built earlier in the test job. When run locally without that variable, the scripts build images as needed.
 
 
-For instructions covering local application unit tests, Docker smoke and integration tests, and Kubernetes manifest and cluster tests, see the [local testing guide](docs/local-testing.md).
+For instructions covering local application unit tests, Docker smoke and integration tests, and Kubernetes manifest and cluster tests, see the [local testing guide](docs/guides/local-testing.md).
 
 
 ## Key technologies and implementation
