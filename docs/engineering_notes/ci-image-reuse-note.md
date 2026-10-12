@@ -39,5 +39,5 @@ Important note: all numbers used here are approximate and vary slightly between 
 
 - Build the `api`, `worker`, and `fetcher` images once with Docker Compose.
 - Save the `trading-api:dev`, `trading-worker:dev`, and `trading-fetcher:dev` images to a single archive and upload it as a workflow artifact.
-- Reuse a local composite action to download the archive and load it in the image-scan and application-test jobs.
+- Reuse a local composite action to download the archive and load it where needed
 - Keep the archive filename and artifact name shared through workflow-level variables and composite-action inputs.
