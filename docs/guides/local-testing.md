@@ -134,23 +134,21 @@ kubectl apply -f on-premise.yaml
 
 ## Run tests on the active cluster
 
-To test against a running local minikube or kind cluster, make sure `kubectl` targets that cluster and the required tools are installed (`kubectl`, `kubeseal`, and Helm). Use the appropriate image build-and-load helper and bootstrap steps in the [Kubernetes section of the README](../../readme.md#kubernetes-in-minikube-or-kind). Once the `on-premise` overlay is deployed and the API, worker, and PostgreSQL are ready, run the Kubernetes smoke test.
+To test against a running local minikube or kind cluster, make sure `kubectl` targets that cluster and the required tools are installed (`kubectl`, `kubeseal`, and Helm). Use the appropriate image build-and-load helper and bootstrap steps in the [Kubernetes section of the README](../../readme.md#kubernetes-in-minikube-or-kind). After deploying the `on-premise` overlay, run the readiness check below.
 
-To check that all workload controllers can start run:
+The readiness check confirms that all workload controllers can start and waits for the API, worker, Redis, and PostgreSQL workloads to become ready. It requires the `on-premise` overlay and the `trading-alerts` namespace to be deployed.
 
 ```bash
 python k8s/tests/smoke_tests/workload_controllers_started/run.py
 ```
 
-This waits for the API, worker, Redis, and PostgreSQL workloads to become ready. The check requires the `on-premise` overlay and the `trading-alerts` namespace to be deployed.
-
-
+Once the readiness check succeeds and the API, worker, Redis, and PostgreSQL are ready, run the passthrough test:
 
 ```bash
 python k8s/tests/smoke_tests/simple_passthrough/run.py
 ```
 
-This creates a Kubernetes Job that sends a webhook through the API and checks that the worker stores the alert in PostgreSQL. The full path depends on the `api` service, the worker consuming the alert, Redis carrying it between the API and worker, and PostgreSQL storing it. Ensure the `trading-alerts` namespace and all of those application components are deployed and ready before running the test.
+This creates a Kubernetes Job that sends a webhook through the API and checks that the worker stores the alert in PostgreSQL. The full path depends on the `api` service, the worker consuming the alert, Redis carrying it between the API and worker, and PostgreSQL storing it.
 
 
 ## Other checks
