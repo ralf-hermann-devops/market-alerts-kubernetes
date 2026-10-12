@@ -37,13 +37,12 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
-          env:
-            - name: WORKER_CPU_LOAD_SECONDS
-              value: "0"
           envFrom:
             - configMapRef:
                 name: app-config
           env:
+            - name: WORKER_CPU_LOAD_SECONDS
+              value: "0"
             # worker needs to know the redis and postgres passwords
             - name: REDIS_PASSWORD
               valueFrom:
