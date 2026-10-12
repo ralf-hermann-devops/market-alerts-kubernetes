@@ -12,16 +12,12 @@ spec:
       labels:
         app: redis
     spec:
+      serviceAccountName: redis
+      automountServiceAccountToken: false
       containers:
         - name: redis
           image: redis:7-alpine
           command: [sh, -c, exec redis-server --requirepass "$REDIS_PASSWORD"]
-          env:
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: trading-alerts-secrets
-                  key: redis-password
           ports:
             - name: redis
               containerPort: 6379

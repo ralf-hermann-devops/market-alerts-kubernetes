@@ -35,6 +35,7 @@ services:
   fetcher:
     build: ./services/fetcher
     image: trading-fetcher:dev
+    command: ["python", "-m", "app.scheduler"]
     environment:
       <<: *postgres-env
       SYMBOLS: AAPL

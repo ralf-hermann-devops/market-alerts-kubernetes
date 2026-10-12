@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
 import argparse
-import re
 import subprocess
+import sys
 from collections.abc import Sequence
 from pathlib import Path
+
 
 from sealed_secrets_cli_args import SECRETS, validate_secret_args
 from sealed_secrets_cli_args import create_parser as create_common_parser
@@ -39,10 +40,34 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run(*args):
-    """Print and run a command, raising CalledProcessError on failure."""
-    print(f"$ {' '.join(args)}")
-    subprocess.run(args, check=True)
+def run(*command: str,
+        input_text: str | None = None,
+        print_stdout: bool = True) -> subprocess.CompletedProcess[str]:
+    """Run a command, display its output, and raise a useful error on failure."""
+    print(f"$ {' '.join(command)}")
+    result = subprocess.run(
+        command,
+        input=input_text,
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode:
+        details = "\n".join(
+            output.strip()
+            for output in (result.stdout, result.stderr)
+            if output.strip()
+        )
+        raise RuntimeError(
+            f"{' '.join(command)} failed with exit code "
+            f"{result.returncode}:\n{details or 'Command returned no output.'}"
+        )
+
+    if print_stdout and result.stdout:
+        print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
+    return result
 
 
 def wait_for_crd(crd, timeout=120):
@@ -106,42 +131,24 @@ def choose_overlay(overlays):
             print(f"Choose a number from 1 to {len(overlays)}.")
 
 
-def apply_infrastructure(infrastructure_dir):
-    """Render infrastructure with Helm and apply CRDs before other resources."""
-    command = ["kubectl", "kustomize", "--enable-helm", str(infrastructure_dir)]
-    print(f"$ {' '.join(command)}")
-
-    build = subprocess.run(
-        command,
-        stdout=subprocess.PIPE,
-        text=True,
-        check=True,
+def apply_infrastructure(infrastructure_dir, kustomize_args=[]):
+    """Render infrastructure kustomize args and apply all rendered resources."""
+    build = run("kubectl", "kustomize", *kustomize_args, str(infrastructure_dir),
+        print_stdout=False,
     )
 
-    documents = re.split(r"(?m)^---\s*$", build.stdout)
-    crds = []
-    resources = []
-    for document in documents:
-        if re.search(r"(?m)^kind:\s*CustomResourceDefinition\s*$", document):
-            crds.append(document)
-        else:
-            resources.append(document)
-
-    for manifests, options in (
-        (crds, ["--server-side", "--force-conflicts"]),
-        (resources, []),
-    ):
-        if not manifests:
-            continue
-
-        apply_command = ["kubectl", "apply", *options, "-f", "-"]
-        print(f"$ {' '.join(apply_command)}")
-        subprocess.run(
-            apply_command,
-            input="\n---\n".join(manifests),
-            text=True,
-            check=True,
-        )
+    # API-server managedFields tracks ownership without the oversized last-applied annotation.
+    # Use `kubectl get <RESSOURCE> <NAME> -n keda -o yaml --show-managed-fields`
+    # to see the fields managed by the API server.
+    # Managed ressources include the deployments
+    # - keda-operator
+    # - keda-admission-webhooks
+    # - keda-operator-metrics-apiserver
+    # and validatingwebhookconfiguration
+    # - keda-admission
+    run("kubectl", "apply", "--server-side", "--force-conflicts", "-f", "-",
+        input_text=build.stdout,
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -150,14 +157,15 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parser.parse_args(argv)
     validate_secret_args(args, parser)
 
-    k8s_dir = Path(__file__).resolve().parent.parent
+    k8s_dir = Path(__file__).resolve().parents[1]
     manifests_dir = k8s_dir / "manifests"
     overlays = find_overlays(manifests_dir / "overlays")
     if args.overlay is not None:
-        selected_overlay = next(
-            (overlay for overlay in overlays if overlay.name == args.overlay),
-            None,
-        )
+        selected_overlay = None
+        for overlay in overlays:
+            if overlay.name == args.overlay:
+                selected_overlay = overlay
+                break
         if selected_overlay is None:
             parser.error(
                 f"unknown overlay {args.overlay!r}; available overlays: "
@@ -165,37 +173,45 @@ def main(argv: Sequence[str] | None = None) -> None:
             )
     elif args.non_interactive:
         if len(overlays) != 1:
-            parser.error(
-                "--non-interactive requires --overlay when multiple overlays are available"
-            )
+            parser.error("--non-interactive requires --overlay when multiple overlays are available")
         selected_overlay = overlays[0]
     else:
         selected_overlay = choose_overlay(overlays)
 
-    # Phase 1: Install external infrastructure: KEDA + sealed secrets.
-    apply_infrastructure(manifests_dir / "infrastructure")
+    # Phase 1: Install shared external infrastructure: KEDA
+    apply_infrastructure(manifests_dir / "infrastructure", kustomize_args=["--enable-helm"])
 
-    # The CRD must exist before we can create a ScaledObject.
-    wait_for_crd("scaledobjects.keda.sh")
-    wait_for_crd("sealedsecrets.bitnami.com")
-
-    # Phase 2: Install the application overlay, which may contain custom resources.
-    # Wait until the controller can serve its public certificate to kubeseal.
-    run("kubectl", "rollout", "status", "deployment/sealed-secrets-controller",
-        "--namespace", "kube-system", "--timeout=120s")
     
-    secret_args = []
-    for attribute, option, _ in SECRETS:
-        value = getattr(args, attribute)
-        if value is not None:
-            secret_args.extend((f"--{option}", value))
-    if args.non_interactive:
-        secret_args.append("--non-interactive")
 
-    secret_creation_status = create_sealed_secret(secret_args)
-    if secret_creation_status != 0:
-        # Hide the traceback from the user. Might be misleading and not helpful in this context.
-        raise SystemExit(secret_creation_status)
+    # Phase 2: Special overlay-specific steps before overlay is getting applied.
+    # One thing to do is install the overlay's secrets and secret solution
+    # The on-premise overlay needs the sealed-secrets controller to be installed first
+    # so the bootstrap script can create the sealed secret for the overlay.
+    if selected_overlay.name == "on-premise":
+        apply_infrastructure(selected_overlay / "sealed_secrets_install")
+
+        # Wait until the controller can serve its public certificate to kubeseal.
+        wait_for_crd("sealedsecrets.bitnami.com")
+        run("kubectl", "rollout", "status", "deployment/sealed-secrets-controller",
+            "--namespace", "kube-system", "--timeout=120s")
+
+        secret_args = []
+        for attribute, option, _ in SECRETS:
+            value = getattr(args, attribute)
+            if value is not None:
+                secret_args.extend((f"--{option}", value))
+        if args.non_interactive:
+            secret_args.append("--non-interactive")
+
+        secret_creation_status = create_sealed_secret(secret_args)
+        if secret_creation_status != 0:
+            # Hide the traceback from the user. Might be misleading and not helpful in this context.
+            raise SystemExit(secret_creation_status)
+    elif selected_overlay.name == "aws":
+        raise NotImplementedError("AWS overlay is not yet supported in this script.")
+    else:
+        raise NotImplementedError(f"Overlay {selected_overlay.name!r} is not supported in this script.")
+
 
     # We intentionally do not wait for the KEDA operator to be ready.
     # Kubernetes can create the Custom Resources as soon as its CRD exists.

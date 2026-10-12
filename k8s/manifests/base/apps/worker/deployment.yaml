@@ -12,24 +12,39 @@ spec:
       labels:
         app: worker
     spec:
+      serviceAccountName: worker
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
       containers:
         - name: worker
           image: trading-worker:dev
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           envFrom:
             - configMapRef:
                 name: app-config
           env:
+            - name: WORKER_CPU_LOAD_SECONDS
+              value: "0"
             # worker needs to know the redis and postgres passwords
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: trading-alerts-secrets
-                  key: redis-password
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: trading-alerts-secrets
-                  key: postgres-password
+            
           # add a way to test for readiness and liveness probes
           resources:
             requests:

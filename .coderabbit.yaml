@@ -8,7 +8,7 @@ reviews:
   profile: assertive
   allow_author_approval: true
   request_changes_workflow: false
-  high_level_summary_in_walkthrough: true
+  high_level_summary_in_walkthrough: false
   high_level_summary: true
   high_level_summary_placeholder: "@coderabbitai summary"
   auto_title_instructions: "Use \"target -> base | \" to start the title"

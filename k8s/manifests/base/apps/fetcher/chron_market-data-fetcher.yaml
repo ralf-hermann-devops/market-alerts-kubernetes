@@ -18,9 +18,34 @@ spec:
       template:
         spec:
           restartPolicy: Never
+          serviceAccountName: fetcher
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          volumes:
+            - name: tmp
+              emptyDir:
+                sizeLimit: 64Mi
           containers:
             - name: fetcher
               image: trading-fetcher:dev
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+              env:
+                - name: HOME
+                  value: /tmp
               resources:
                 requests:
                   cpu: 100m
@@ -34,9 +59,3 @@ spec:
                     name: app-config
                 - configMapRef:
                     name: fetcher-config
-              env:
-                - name: POSTGRES_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: trading-alerts-secrets
-                      key: postgres-password

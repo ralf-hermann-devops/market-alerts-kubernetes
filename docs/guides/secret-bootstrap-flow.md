@@ -22,4 +22,4 @@ The `k8s/bootstrapping/bootstrap_kubernetes_resources.py` bootstrap script selec
 The bootstrap script also accepts `--overlay` to select an overlay without prompting. In non-interactive mode, it selects the only available overlay automatically or requires `--overlay` if there is more than one.
 
 
-![Architecture overview showing the local Docker Compose and Kubernetes deployments](kubernetes_secret_bootstrap_deployment.drawio.png)
+![Architecture overview showing the local Docker Compose and Kubernetes deployments](../images/kubernetes_secret_bootstrap_deployment.drawio.png)

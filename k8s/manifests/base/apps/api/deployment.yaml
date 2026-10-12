@@ -14,26 +14,37 @@ spec:
       labels:
         app: api
     spec:
+      serviceAccountName: api
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
       containers:
         - name: api
           image: trading-api:dev
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           ports:
             - name: http
               containerPort: 8000
           envFrom:
             - configMapRef:
                 name: app-config
-          env:
-            - name: WEBHOOK_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: trading-alerts-secrets
-                  key: webhook-secret
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: trading-alerts-secrets
-                  key: redis-password
           readinessProbe: # 30s to unready
             httpGet:
               path: /readyz
