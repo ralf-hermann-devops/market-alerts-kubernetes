@@ -14,4 +14,4 @@ RUN python -m pip install --no-cache-dir --upgrade pip setuptools \
 COPY app/ ./app/
 RUN useradd -u 10001 app && chown -R app /app
 USER app
-CMD ["python", "-m", "app.scheduler"]
+CMD ["python", "-m", "app.fetcher"]

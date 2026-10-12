@@ -4,6 +4,19 @@ This project is a small, containerized backend for collecting and processing tra
 
 The services are packaged with Docker, and the project supports both local Kubernetes deployments with Minikube or kind and cloud deployments on AWS. The Terraform for AWS deployments is managed separately in the [`market-alerts-infrastructure`](https://github.com/ralf-hermann-devops/market-alerts-infrastructure) repository.
 
+## Table of contents
+
+- [General architecture](#general-architecture)
+- [Project structure](#project-structure)
+- [Sending TradingView webhook alerts](#sending-tradingview-webhook-alerts)
+- [Running locally](#running-locally)
+  - [Docker Compose](#docker-compose)
+  - [Kubernetes in minikube or kind](#kubernetes-in-minikube-or-kind)
+- [CI/CD and local testing](#cicd-and-local-testing)
+- [Key technologies and implementation](#key-technologies-and-implementation)
+
+
+
 ## General architecture
 
 TradingView sends alerts to the API, which validates each alert's shared secret and publishes valid alerts to a Redis stream. The worker consumes that stream and persists alerts to PostgreSQL. Independently, the market-data fetcher periodically retrieves candle data from Yahoo Finance and stores it in PostgreSQL.
@@ -28,7 +41,7 @@ The same services can run locally with Docker Compose or be deployed to Kubernet
     - See [`docs/architecture_decision_records/`](docs/architecture_decision_records/) for decisions about Redis, PostgreSQL, secrets, Kustomize, and staged deployment
     - See [`docs/engineering_notes/`](docs/engineering_notes/) for further engineering notes on implementation and operational topics that do not have an architectural impact.
     - See [`docs/debugging_note.md`](docs/debugging_note.md) for an overview of how errors encountered during development were investigated and addressed.
-    - `docs/guides/` — contains guides and deep dives about certain aspects of the repository, including:
+    - See `docs/guides/` for guides and deep dives about certain aspects of the repository, including:
         - [`docs/guides/secret-bootstrap-flow.md`](docs/guides/secret-bootstrap-flow.md) — describes in detail how thet bootstraping of a Sealed Secrets works
         - [`docs/guides/local-testing.md`](docs/guides/local-testing.md) — describes how to run unit tests, Docker-based integration tests, and Kubernetes cluster tests.
 
@@ -55,13 +68,13 @@ TradingView requires a publicly reachable HTTPS webhook URL, `localhost` and pri
 ## Running locally
 ### Docker Compose
 
-Docker Compose starts the API, worker, fetcher, Redis, and PostgreSQL:
+Docker Compose starts the API, worker, fetcher, Redis, and PostgreSQL. Locally, the fetcher runs on a five-minute scheduler:
 
 ```bash
 docker compose -f Dockercompose.yaml up --build
 ```
 
-The API is available at `http://localhost:8000`. Local Compose credentials are for development only, do not use them in shared or production environments.
+The API is available at `http://localhost:8000`. In Kubernetes, the fetcher image runs once per CronJob invocation instead; the CronJob schedules it every 15 minutes on weekdays. Local Compose credentials are for development only, do not use them in shared or production environments.
 
 
 ### Kubernetes in minikube or kind
@@ -94,7 +107,7 @@ python k8s/bootstrapping/bootstrap_kubernetes_resources.py
 The bootstrap script installs the Sealed Secrets controller, prompts for the application secret values, writes the encrypted SealedSecret manifest, and applies the selected overlay.
 See the [secret bootstrap and deployment diagram](docs/guides/secret-bootstrap-flow.md) for the sequence and where decryption occurs.
 
-## CI/CD and platform infrastructure
+## CI/CD and local testing
 
 The `application-ci.yml` workflow runs on pushes and pull requests that change files under `services/`, `Dockercompose.yaml`, or the workflow itself. It runs Ruff over the Python services, audits each service's Python dependencies, builds and scans the API, worker, and fetcher images for HIGH and CRITICAL vulnerabilities, and runs the API unit tests plus the Docker-based worker smoke and API-to-worker integration tests.
 

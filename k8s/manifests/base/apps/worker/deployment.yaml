@@ -15,6 +15,9 @@ spec:
       containers:
         - name: worker
           image: trading-worker:dev
+          env:
+            - name: WORKER_CPU_LOAD_SECONDS
+              value: "0"
           envFrom:
             - configMapRef:
                 name: app-config
