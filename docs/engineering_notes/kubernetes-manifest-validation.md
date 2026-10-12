@@ -11,7 +11,7 @@ Name Kustomize patch files with `patch` in the filename, for example `secret-env
 
 ## CI validation details
 
-The `kubernetes-manifests-validation` job in `.github/workflows/application-ci.yml` checks the infrastructure target, the base, and the overlays. Kubeconform checks each target's source manifests, while `kubectl kustomize` separately builds each target so the assembled output can also be validated.
+The `kubernetes-manifests-validation` job in `.github/workflows/application-ci.yml` checks the infrastructure target, the base, and the `on-premise` overlay. Kubeconform checks each target's source manifests, while `kubectl kustomize` separately builds each target so the assembled output can also be validated.
 
 ### Validation scope
 
