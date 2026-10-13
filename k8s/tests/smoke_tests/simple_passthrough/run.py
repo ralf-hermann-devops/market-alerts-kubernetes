@@ -62,47 +62,50 @@ def main() -> int:
         print(f"Alert rows before test: {before_count}")
 
         # Recreate the fixed-name Job so each run executes a fresh test pod.
-        kubectl(
-            "delete",
-            "job",
-            JOB_NAME,
-            "-n",
-            NAMESPACE,
-            "--ignore-not-found=true",
-        )
+        kubectl("delete", "job", JOB_NAME,
+            "-n", NAMESPACE,
+            "--ignore-not-found=true")
         kubectl("apply", "-k", str(KUSTOMIZATION))
 
         try:
             kubectl("wait", "-n", NAMESPACE,
                 "--for=condition=complete", f"job/{JOB_NAME}",
-                f"--timeout={JOB_TIMEOUT_SECONDS}s",
-            )
+                f"--timeout={JOB_TIMEOUT_SECONDS}s")
             show_job_logs(JOB_NAME)
         except subprocess.CalledProcessError:
             print("Job did not complete successfully; showing its logs.", file=sys.stderr)
             show_job_logs(JOB_NAME)
             return 1
             
+
+        # Read from job config how many requests were sent
+        n_requests_str = kubectl("get", "job", JOB_NAME, "-n", NAMESPACE,
+                "-o=jsonpath='{.spec.template.spec.containers[0].env[?(@.name==\"REQUEST_COUNT\")].value}'",
+                capture_output=True)[1:-1] # the number comes wrapped in quotes e.g. '5'
+        n_requests = int(n_requests_str)
+
+
         # The worker writes asynchronously, so poll for the expected new row.
         deadline = time.monotonic() + DATABASE_TIMEOUT_SECONDS
         after_count = alert_count()
-        while after_count <= before_count and time.monotonic() < deadline:
-            time.sleep(POLL_INTERVAL_SECONDS)
+        test_successful = False
+        while not test_successful and time.monotonic() < deadline:
             after_count = alert_count()
-
-        print(f"Alert rows after test:  {after_count}")
+            test_successful = after_count == before_count + n_requests
+            time.sleep(POLL_INTERVAL_SECONDS)
 
         # Fail if the Job completed but the alert was not persisted.
-        if after_count <= before_count:
-            print(
-                "The API test Job completed, but no new alert row appeared "
-                f"within {DATABASE_TIMEOUT_SECONDS} seconds.",
-                file=sys.stderr,
-            )
+        if test_successful:
+            print(f"Database row count increased by {after_count - before_count}.")
+            return 0
+        else:
+            print("The API test Job completed, but not all new alert row appeared "
+                   f"within {DATABASE_TIMEOUT_SECONDS} seconds."
+                   f"Expected increase: {n_requests}; actuall increase: {after_count}",
+                   file=sys.stderr)
             return 1
 
-        print(f"Database row count increased by {after_count - before_count}.")
-        return 0
+        
     except FileNotFoundError as error:
         print(f"Required command not found: {error.filename}", file=sys.stderr)
         return 1

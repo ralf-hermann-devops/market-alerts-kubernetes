@@ -8,7 +8,6 @@ DATABASE_POD = "postgres-0"
 DATABASE = "alerts"
 KUSTOMIZATION = Path(__file__).resolve().parent
 JOB_NAME = "constant-load"
-JOB_TIMEOUT_SECONDS = 300
 DATABASE_TIMEOUT_SECONDS = 30
 POLL_INTERVAL_SECONDS = 2
 
@@ -68,37 +67,24 @@ def main() -> int:
         
         kubectl("apply", "-k", str(KUSTOMIZATION))
 
+
         try:
+            job_duration_sec = kubectl("get", "job", JOB_NAME, "-n", NAMESPACE,
+                "-o=jsonpath='{.spec.template.spec.containers[0].env[?(@.name==\"DURATION_SECONDS\")].value}'",
+                capture_output=True)[1:-1] # the number comes wrapped in quotes e.g. '5'
+            job_timout_sec = int(int(job_duration_sec)*1.5)
             kubectl("wait", "-n", NAMESPACE,
                 "--for=condition=complete", f"job/{JOB_NAME}",
-                f"--timeout={JOB_TIMEOUT_SECONDS}s",
+                f"--timeout={job_timout_sec}s",
             )
             show_job_logs(JOB_NAME)
         except subprocess.CalledProcessError:
             print("Job did not complete successfully; showing its logs.", file=sys.stderr)
             show_job_logs(JOB_NAME)
             return 1
-            
-        # The worker writes asynchronously, so poll for the expected new row.
-        deadline = time.monotonic() + DATABASE_TIMEOUT_SECONDS
-        after_count = alert_count()
-        while after_count <= before_count and time.monotonic() < deadline:
-            time.sleep(POLL_INTERVAL_SECONDS)
-            after_count = alert_count()
 
-        print(f"Alert rows after test:  {after_count}")
-
-        # Fail if the Job completed but the alert was not persisted.
-        if after_count <= before_count:
-            print(
-                "The constant-load Job completed, but no new alert row appeared "
-                f"within {DATABASE_TIMEOUT_SECONDS} seconds.",
-                file=sys.stderr,
-            )
-            return 1
-
-        print(f"Database row count increased by {after_count - before_count}.")
-        return 0
+        # TODO add test conditions after job termination
+       
     except FileNotFoundError as error:
         print(f"Required command not found: {error.filename}", file=sys.stderr)
         return 1

@@ -47,7 +47,33 @@ histogram_quantile(
   )
 )
 ```
-
-The `[5m]` range is the rate calculation window. Increase it, for example to `[20m]`, when request volume is low or when inspecting a longer period.
-
 The Redis pod's exporter sidecar reports consumer-group lag, pending entries, and the age of the oldest outstanding message independently of worker processing. This prevents slow worker processing from delaying the Redis metrics refresh. Verify the `redis-metrics` target is **UP** on Prometheus's Targets page.
+
+
+## Cluster overview with headlamp
+
+Headlamp is a user-friendly Kubernetes UI that is being deployed within the cluster.
+
+To get access to headlamp run these commands
+
+1. Get the application URL by running the following commands. If you're using windows you can also copy and past the kubectl output into the subsequent commands.
+
+```bash
+export POD_NAME=$(kubectl get pods --namespace monitoring -l "app.kubernetes.io/name=headlamp,app.kubernetes.io/instance=headlamp" -o jsonpath="{.items[0].metadata.name}")
+```
+
+```bash
+export CONTAINER_PORT=$(kubectl get pod --namespace monitoring $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+```
+  
+Then start a port forward with kubectl. Make sure to leave this process running. 
+
+```bash
+kubectl --namespace monitoring port-forward $POD_NAME 8080:$CONTAINER_PORT
+```
+Then you can open http://127.0.0.1:8080 in your browser.
+  
+To get a access token run
+```bash
+kubectl create token headlamp --namespace monitoring
+```
