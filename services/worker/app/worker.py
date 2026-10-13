@@ -29,9 +29,9 @@ this worker reads only new messages with >. Bound the load to the available
 shutdown time or stop it on SIGTERM, and provide a path to recover pending alerts.
 """
 def simulate_cpu_load(duration_seconds: float) -> None:
-    deadline = time.process_time() + duration_seconds
+    deadline = time.monotonic() + duration_seconds
     value = 0
-    while time.process_time() < deadline:
+    while time.monotonic() < deadline:
         value = (value * 6364136223846793005 + 1) & 0xFFFFFFFFFFFFFFFF  # keep number in 64 bit boundries to not consume too much memory
 
 def main():

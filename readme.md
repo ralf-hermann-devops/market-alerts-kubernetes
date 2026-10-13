@@ -44,6 +44,7 @@ The same services can run locally with Docker Compose or be deployed to Kubernet
     - See `docs/guides/` for guides and deep dives about certain aspects of the repository, including:
         - [`docs/guides/secret-bootstrap-flow.md`](docs/guides/secret-bootstrap-flow.md) — describes in detail how thet bootstraping of a Sealed Secrets works
         - [`docs/guides/local-testing.md`](docs/guides/local-testing.md) — describes how to run unit tests, Docker-based integration tests, and Kubernetes cluster tests.
+        - [`docs/guides/kubernetes-monitoring.md`](docs/guides/kubernetes-monitoring.md) — describes the Kubernetes monitoring stack and Grafana dashboards.
 
 ## Sending TradingView webhook alerts
 
@@ -121,7 +122,7 @@ For instructions covering local application unit tests, Docker smoke and integra
 
 The FastAPI endpoint validates TradingView alerts and their shared secret, then publishes accepted alerts to a Redis stream. A separate worker consumes the stream and writes alerts to PostgreSQL, while the market-data fetcher retrieves candles with yfinance and stores them in the same database.
 
-- **API metrics:** The API exposes Prometheus-formatted request counts and request-duration histograms at `/metrics`. Metrics use HTTP method, route template, and response status labels; the metrics scrape itself is excluded. The current Ingress only routes the webhook path, so `/metrics` is not externally exposed.
+- **API metrics:** The API exposes Prometheus-formatted request counts and request-duration histograms at `/metrics`. The histogram uses finer bucket boundaries below 10 ms to distinguish the API's fast requests, plus wider buckets for slower outliers. Metrics use HTTP method, route template, and response status labels; the metrics scrape itself is excluded. The current Ingress only routes the webhook path, so `/metrics` is not externally exposed.
 - **Application services:** Pydantic validates webhook data, redis-py and Psycopg connect the API and worker to Redis and PostgreSQL.
 - **Local and cluster deployment:** Docker Compose runs the services locally. Kubernetes manifests use Kustomize overlays, with NetworkPolicies restricting service access, Sealed Secrets for application credentials, KEDA to scale the worker from queue load and CPU, and kube-prometheus-stack for Kubernetes and application monitoring.
 - **Checks in CI:** pytest covers API behavior and Docker-based tests exercise the worker and API-to-worker flow. Ruff runs linting, pip-audit does dependency audits, and Trivy image scans provide additional vulnerability checks.

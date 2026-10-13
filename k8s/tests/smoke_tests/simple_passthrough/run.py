@@ -6,7 +6,8 @@ from pathlib import Path
 NAMESPACE = "trading-alerts"
 DATABASE_POD = "postgres-0"
 DATABASE = "alerts"
-MANIFEST = Path(__file__).resolve().with_name("send_to_api.yaml")
+KUSTOMIZATION = Path(__file__).resolve().parent
+JOB_NAME = "simple-passthrough"
 JOB_TIMEOUT_SECONDS = 120
 DATABASE_TIMEOUT_SECONDS = 30
 POLL_INTERVAL_SECONDS = 2
@@ -60,21 +61,27 @@ def main() -> int:
         before_count = alert_count()
         print(f"Alert rows before test: {before_count}")
 
-        # Create this run's uniquely named Job and wait for it to finish.
-        created_job = kubectl("create","-f", str(MANIFEST), "-o", "name", capture_output=True)
-        job_name = created_job.split("/", maxsplit=1)[-1]
-        print(f"Created {job_name}")
+        # Recreate the fixed-name Job so each run executes a fresh test pod.
+        kubectl(
+            "delete",
+            "job",
+            JOB_NAME,
+            "-n",
+            NAMESPACE,
+            "--ignore-not-found=true",
+        )
+        kubectl("apply", "-k", str(KUSTOMIZATION))
 
         try:
             kubectl("wait", "-n", NAMESPACE,
-                "--for=condition=complete", f"job/{job_name}",
+                "--for=condition=complete", f"job/{JOB_NAME}",
                 f"--timeout={JOB_TIMEOUT_SECONDS}s",
             )
-            show_job_logs(job_name)
+            show_job_logs(JOB_NAME)
         except subprocess.CalledProcessError:
             print("Job did not complete successfully; showing its logs.", file=sys.stderr)
-            show_job_logs(job_name)
-            return 1            
+            show_job_logs(JOB_NAME)
+            return 1
             
         # The worker writes asynchronously, so poll for the expected new row.
         deadline = time.monotonic() + DATABASE_TIMEOUT_SECONDS

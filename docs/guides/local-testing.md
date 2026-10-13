@@ -80,7 +80,7 @@ Before applying the application overlay, install KEDA and kube-prometheus-stack 
 python k8s/bootstrapping/helm_charts_setup/install_helm_charts.py
 ```
 
-Each chart can optionally set `values_file` in `install_helm_charts.py`; when set, that path is passed to Helm with `--values`. Paths are interpreted relative to the working directory used to run the installer.
+Each chart can optionally set `values_file` in `install_helm_charts.py`; when set, that path is passed to Helm with `--values`. Paths are interpreted relative to the working directory used to run the installer. For dashboard access and monitoring queries, see the [Kubernetes monitoring guide](./kubernetes-monitoring.md).
 
 Install the on-premise Sealed Secrets controller:
 

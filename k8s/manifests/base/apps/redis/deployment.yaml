@@ -42,3 +42,37 @@ spec:
             limits:
               cpu: 500m
               memory: 256Mi
+        - name: redis-exporter
+          image: trading-redis-exporter:dev
+          ports:
+            - name: metrics
+              containerPort: 8001
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: app-config
+          env:
+            - name: REDIS_HOST
+              value: 127.0.0.1
+            - name: METRICS_PORT
+              value: "8001"
+            - name: COLLECTION_INTERVAL_SECONDS
+              value: "5"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi

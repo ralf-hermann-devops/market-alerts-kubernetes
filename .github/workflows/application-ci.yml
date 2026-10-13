@@ -43,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [api, worker, fetcher]
+        service: [api, worker, fetcher, redis-exporter]
     permissions:
       contents: read
     steps:
@@ -70,9 +70,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Build service images
-        run: docker compose -f Dockercompose.yaml build --pull api worker fetcher
+        run: docker compose -f Dockercompose.yaml build --pull api worker fetcher redis-exporter
       - name: Save service images
-        run: docker save -o "${{ env.SERVICE_IMAGES_ARTIFACT }}.tar" trading-api:dev trading-worker:dev trading-fetcher:dev
+        run: docker save -o "${{ env.SERVICE_IMAGES_ARTIFACT }}.tar" trading-api:dev trading-worker:dev trading-fetcher:dev trading-redis-exporter:dev
       - name: Upload service images
         uses: actions/upload-artifact@v4
         with:
@@ -88,7 +88,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [api, worker, fetcher]
+        service: [api, worker, fetcher, redis-exporter]
     permissions:
       contents: read
     steps:
@@ -130,6 +130,8 @@ jobs:
         run: python -m pip install -r services/api/requirements.txt
       - name: Run API unit tests
         run: python -m pytest services/api/tests/test_testclient_api.py
+      - name: Run Redis exporter tests
+        run: python -m pytest services/redis/tests/test_exporter.py
       - name: Load service images
         uses: ./.github/actions/load-service-images
         with:
@@ -252,6 +254,7 @@ jobs:
             trading-api:dev \
             trading-worker:dev \
             trading-fetcher:dev \
+            trading-redis-exporter:dev \
             --name app-test
 
       - name: Run bootstrapping script to deploy services to kind cluster

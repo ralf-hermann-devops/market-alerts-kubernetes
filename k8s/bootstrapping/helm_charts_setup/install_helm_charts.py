@@ -39,6 +39,14 @@ HELM_CHARTS = (
         namespace="monitoring",
         crds_to_wait_for=("servicemonitors.monitoring.coreos.com",),
     ),
+    HelmChart(
+        release_name="headlamp",
+        chart="headlamp/headlamp",
+        version="0.45.0",
+        repository_name="headlamp",
+        repository_url="https://kubernetes-sigs.github.io/headlamp/",
+        namespace="monitoring",
+    )
 )
 
 

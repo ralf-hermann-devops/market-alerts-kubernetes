@@ -112,6 +112,14 @@ def test_metrics_reports_request_count_latency_and_errors(monkeypatch):
         'http_request_duration_seconds_count{method="POST",path="/webhook/tradingview"} 2.0'
         in metrics
     )
+    assert (
+        'http_request_duration_seconds_bucket{le="0.001",method="POST",path="/webhook/tradingview"}'
+        in metrics
+    )
+    assert (
+        'http_request_duration_seconds_bucket{le="0.003",method="POST",path="/webhook/tradingview"}'
+        in metrics
+    )
     assert 'path="/metrics"' not in metrics
 
 
