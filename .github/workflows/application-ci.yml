@@ -148,15 +148,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: infrastructure
-            path: k8s/manifests/infrastructure
-            kustomize_args: --enable-helm
           - target: base
             path: k8s/manifests/base
-            kustomize_args: ""
           - target: on-premise
             path: k8s/manifests/overlays/on-premise
-            kustomize_args: ""
 
           
     permissions:
@@ -165,10 +160,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: azure/setup-helm@v4
-        if: matrix.target == 'infrastructure'
-        with:
-          version: v3.17.3
       
       # External CR schemas and CRD exclusions are documented in the engineering note.
       - name: Install kubeconform
@@ -198,7 +189,6 @@ jobs:
         run: |
           kubectl kustomize \
             "${{ matrix.path }}" \
-            ${{ matrix.kustomize_args }} \
             > "$RUNNER_TEMP/combined.yaml"
           
       # Validate the assembled output, including patches, generators, and transformations.
@@ -239,6 +229,11 @@ jobs:
           tar -xzf "$RUNNER_TEMP/kubeseal.tar.gz" -C "$RUNNER_TEMP" kubeseal
           sudo install -m 755 "$RUNNER_TEMP/kubeseal" /usr/local/bin/kubeseal
           kubeseal --version
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
 
       # https://github.com/marketplace/actions/kind-cluster
       - name: Create kind cluster

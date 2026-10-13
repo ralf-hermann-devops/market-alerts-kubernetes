@@ -63,7 +63,7 @@ These credentials are intentionally disposable and exist only to support local i
 
 ### Deployment in Kubernetes
 
-The sealed manifest is applied with the selected Kustomize overlay. A bootstrap script will be created to securely provide the cluster with the required secrets using Sealed Secrets.
+The bootstrap script installs configured external Helm charts, installs the selected overlay's Sealed Secrets controller, generates the encrypted SealedSecret manifest, and applies the selected Kustomize overlay. Secret generation happens only after the controller is ready so its public certificate is available to `kubeseal`.
 
 <br/>
 

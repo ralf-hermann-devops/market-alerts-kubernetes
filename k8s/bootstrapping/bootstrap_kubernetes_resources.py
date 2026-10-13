@@ -6,16 +6,14 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-
+from create_sealed_secret import main as create_sealed_secret
+from helm_charts_setup.install_helm_charts import install_helm_charts
 from sealed_secrets_cli_args import SECRETS, validate_secret_args
 from sealed_secrets_cli_args import create_parser as create_common_parser
-from create_sealed_secret import main as create_sealed_secret
 
 """
-To avoid initializing custom resources before their CRDs are established,
-we split the deployment into two phases:
-1. Install external infrastructure: KEDA + sealed secrets.
-2. Install the application overlay, which may contain custom resources.
+Install configured Helm charts and sealed secrets before applying the
+application overlay, which may contain custom resources from those charts.
 """
 
 
@@ -50,6 +48,7 @@ def run(*command: str,
         input=input_text,
         capture_output=True,
         text=True,
+        check=False,
     )
 
     if result.returncode:
@@ -131,22 +130,22 @@ def choose_overlay(overlays):
             print(f"Choose a number from 1 to {len(overlays)}.")
 
 
-def apply_infrastructure(infrastructure_dir, kustomize_args=[]):
-    """Render infrastructure kustomize args and apply all rendered resources."""
-    build = run("kubectl", "kustomize", *kustomize_args, str(infrastructure_dir),
+def apply_kustomization(kustomization_dir):
+    """Render and apply a Kustomize target using server-side apply."""
+    build = run(
+        "kubectl",
+        "kustomize",
+        str(kustomization_dir),
         print_stdout=False,
     )
 
-    # API-server managedFields tracks ownership without the oversized last-applied annotation.
-    # Use `kubectl get <RESSOURCE> <NAME> -n keda -o yaml --show-managed-fields`
-    # to see the fields managed by the API server.
-    # Managed ressources include the deployments
-    # - keda-operator
-    # - keda-admission-webhooks
-    # - keda-operator-metrics-apiserver
-    # and validatingwebhookconfiguration
-    # - keda-admission
-    run("kubectl", "apply", "--server-side", "--force-conflicts", "-f", "-",
+    run(
+        "kubectl",
+        "apply",
+        "--server-side",
+        "--force-conflicts",
+        "-f",
+        "-",
         input_text=build.stdout,
     )
 
@@ -178,17 +177,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     else:
         selected_overlay = choose_overlay(overlays)
 
-    # Phase 1: Install shared external infrastructure: KEDA
-    apply_infrastructure(manifests_dir / "infrastructure", kustomize_args=["--enable-helm"])
+    # Install chart CRDs before applying the application overlay.
+    install_helm_charts()
 
-    
-
-    # Phase 2: Special overlay-specific steps before overlay is getting applied.
-    # One thing to do is install the overlay's secrets and secret solution
-    # The on-premise overlay needs the sealed-secrets controller to be installed first
-    # so the bootstrap script can create the sealed secret for the overlay.
+    # Install the secret solution before creating its SealedSecret.
     if selected_overlay.name == "on-premise":
-        apply_infrastructure(selected_overlay / "sealed_secrets_install")
+        apply_kustomization(selected_overlay / "sealed_secrets_install")
 
         # Wait until the controller can serve its public certificate to kubeseal.
         wait_for_crd("sealedsecrets.bitnami.com")
@@ -212,10 +206,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     else:
         raise NotImplementedError(f"Overlay {selected_overlay.name!r} is not supported in this script.")
 
-
-    # We intentionally do not wait for the KEDA operator to be ready.
-    # Kubernetes can create the Custom Resources as soon as its CRD exists.
-    # Once controllers start, it will discover and reconcile the existing resource.
     run("kubectl", "apply", "-k", str(selected_overlay))
 
     print("Deployment completed successfully.")

@@ -1,10 +1,20 @@
 # services/api/main.py
 import logging
 import os
+import time
 
 import redis
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Histogram,
+    generate_latest,
+)
 from pydantic import BaseModel
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.responses import Response
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -13,6 +23,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+metrics_registry = CollectorRegistry()
+http_requests = Counter(
+    "http_requests_total",
+    "Total number of HTTP requests handled by the API.",
+    ["method", "path", "status"],
+    registry=metrics_registry,
+)
+http_request_duration = Histogram(
+    "http_request_duration_seconds",
+    "HTTP request duration in seconds.",
+    ["method", "path"],
+    registry=metrics_registry,
+)
 r = redis.Redis(
     host=os.environ["REDIS_HOST"],
     port=int(os.environ["REDIS_PORT"]),
@@ -22,6 +45,30 @@ r = redis.Redis(
 )
 stream_name = os.getenv("REDIS_STREAM", "alerts")
 logger.info("API configured; Redis stream=%s", stream_name)
+
+
+@app.middleware("http")
+async def record_http_metrics(
+    request: Request,
+    call_next: RequestResponseEndpoint,
+) -> Response:
+    if request.url.path == "/metrics":
+        return await call_next(request)
+
+    start_time = time.perf_counter()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
+    finally:
+        route = request.scope.get("route")
+        path = route.path if route is not None else "unmatched"
+        http_requests.labels(request.method, path, str(status_code)).inc()
+        http_request_duration.labels(request.method, path).observe(
+            time.perf_counter() - start_time
+        )
+
 
 class Alert(BaseModel):
     secret: str          # TradingView can't send custom headers, so put it in the JSON body
@@ -77,3 +124,11 @@ def readyz():
         logger.exception("Readiness check failed: Redis is unavailable")
         raise
     return {"ready": True}
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    return Response(
+        content=generate_latest(metrics_registry),
+        media_type=CONTENT_TYPE_LATEST,
+    )
