@@ -43,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [api, worker, fetcher, redis-exporter]
+        service: [api, worker, fetcher, redis]
     permissions:
       contents: read
     steps:
@@ -180,7 +180,7 @@ jobs:
             -summary \
             -output pretty \
             -skip CustomResourceDefinition \
-            -ignore-filename-pattern '(?i)(^|[\\/])([^\\/]*patch[^\\/]*|kustomization\.yaml)$' \
+            -ignore-filename-pattern '(?i)(^|[\\/])([^\\/]*patch[^\\/]*|kustomization\.yaml|[^\\/]*\.(json|sql))$' \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             -strict \
