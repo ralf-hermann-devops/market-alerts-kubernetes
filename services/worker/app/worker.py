@@ -37,7 +37,7 @@ def simulate_cpu_load(duration_seconds: float) -> None:
 def main():
     # Listen for a SIGTERM signal and shutdown gracefully in case of one being set
     running = True
-    signal.signal(signal.SIGTERM, lambda *_: globals().update(running=False))
+    signal.signal(signal.SIGTERM, lambda *_: locals().update(running=False))
 
     r = redis.Redis(
         host=os.environ["REDIS_HOST"],

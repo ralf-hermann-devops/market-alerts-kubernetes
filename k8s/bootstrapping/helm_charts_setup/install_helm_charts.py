@@ -52,7 +52,12 @@ HELM_CHARTS = (
 
 def run(*command: str) -> None:
     print(f"$ {' '.join(command)}")
-    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=120)
+    except subprocess.TimeoutExpired as e:
+        print("Helm install command timed out")
+        raise e
+
     if result.returncode:
         details = "\n".join(
             output.strip()
