@@ -51,7 +51,16 @@ def collect_stream_metrics(
     group_name: str,
     current_time: float | None = None,
 ) -> tuple[int | None, int, float]:
-    """Return unread lag, pending entries, and oldest outstanding age."""
+    """Return unread lag, pending count, and oldest outstanding age in seconds.
+
+    client must decode Redis responses to strings. current_time is Unix time in
+    seconds; None uses the system clock. Lag is None when Redis cannot calculate
+    it. Age uses the oldest pending or unread entry's ID timestamp, is clamped
+    to zero, and is zero when neither kind of entry exists.
+
+    Raise redis.ResponseError if the consumer group is absent. Redis command
+    errors propagate to the caller.
+    """
     groups = cast(list[dict[str, Any]], client.xinfo_groups(stream_name))
     group_info = next(
         (item for item in groups if item["name"] == group_name),
@@ -101,6 +110,13 @@ def refresh_metrics(
     stream_name: str,
     group_name: str,
 ) -> None:
+    """Update Prometheus metrics for the given stream and consumer group.
+
+    Unavailable lag is published as NaN with its availability gauge set to zero.
+    Catch Redis errors, increment the collection error counter, and mark the
+    collection unsuccessful while retaining previous stream gauge values.
+    Other exceptions propagate.
+    """
     labels = (stream_name, group_name)
     try:
         lag, pending_count, oldest_age_seconds = collect_stream_metrics(
@@ -122,6 +138,15 @@ def refresh_metrics(
 
 
 def main() -> None:
+    """Serve metrics over HTTP and refresh Redis Stream metrics indefinitely.
+
+    Read configuration from the environment. METRICS_PORT defaults to 8001 and
+    COLLECTION_INTERVAL_SECONDS defaults to 5 seconds between collections.
+    Raise KeyError if REDIS_PASSWORD is missing and ValueError for invalid numeric
+    settings, including a nonpositive or nonfinite collection interval. HTTP
+    server startup errors propagate; Redis collection errors are handled by
+    refresh_metrics so polling continues.
+    """
     stream_name = os.getenv("REDIS_STREAM", "alerts")
     group_name = os.getenv("REDIS_GROUP", "workers")
     metrics_port = int(os.getenv("METRICS_PORT", "8001"))

@@ -29,12 +29,26 @@ this worker reads only new messages with >. Bound the load to the available
 shutdown time or stop it on SIGTERM, and provide a path to recover pending alerts.
 """
 def simulate_cpu_load(duration_seconds: float) -> None:
+    """Busy-wait for the requested seconds of monotonic elapsed time.
+
+    Nonpositive durations skip the work. The worker's SIGTERM handler does not
+    interrupt this wait.
+    """
     deadline = time.monotonic() + duration_seconds
     value = 0
     while time.monotonic() < deadline:
         value = (value * 6364136223846793005 + 1) & 0xFFFFFFFFFFFFFFFF  # keep number in 64 bit boundries to not consume too much memory
 
 def main():
+    """Consume new Redis Stream alerts and persist them to PostgreSQL.
+
+    Read connection settings from the environment and use the hostname as the
+    consumer name. Ignore duplicate stream IDs on insertion and acknowledge each
+    message only after committing it. Pending messages are not reclaimed.
+
+    Suppress Redis ResponseError during group creation. Configuration, connection,
+    and message processing errors otherwise propagate, stopping the worker.
+    """
     # Listen for a SIGTERM signal and shutdown gracefully in case of one being set
     running = True
     signal.signal(signal.SIGTERM, lambda *_: locals().update(running=False))

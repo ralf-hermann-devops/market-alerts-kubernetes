@@ -70,6 +70,13 @@ async def record_http_metrics(
     request: Request,
     call_next: RequestResponseEndpoint,
 ) -> Response:
+    """Return the downstream response while counting and timing non-metrics requests.
+
+    Record elapsed seconds until call_next returns or raises, using the matched
+    route template or "unmatched" as the path label. Downstream exceptions
+    propagate after being counted with status 500. Requests to /metrics bypass
+    instrumentation.
+    """
     if request.url.path == "/metrics":
         return await call_next(request)
 
@@ -146,6 +153,7 @@ def readyz():
 
 @app.get("/metrics", include_in_schema=False)
 def metrics():
+    """Return the API's metrics registry in Prometheus text exposition format."""
     return Response(
         content=generate_latest(metrics_registry),
         media_type=CONTENT_TYPE_LATEST,

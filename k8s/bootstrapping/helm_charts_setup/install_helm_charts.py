@@ -51,6 +51,11 @@ HELM_CHARTS = (
 
 
 def run(*command: str) -> None:
+    """Run a command with a 120-second timeout and display successful output.
+
+    Raise RuntimeError for a nonzero exit status. subprocess.TimeoutExpired and
+    process startup errors propagate to the caller.
+    """
     print(f"$ {' '.join(command)}")
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=120)
@@ -76,7 +81,15 @@ def run(*command: str) -> None:
 
 
 def install_helm_charts() -> None:
-    """Install configured Helm charts and wait for their required CRDs."""
+    """Install or upgrade configured Helm releases and await required CRDs.
+
+    Update chart repositories and create release namespaces as needed. Each
+    configured CRD must become established within 120 seconds. Relative values
+    file paths are resolved from the current working directory.
+
+    Raise ValueError for conflicting URLs under one repository name. Command
+    failures raise RuntimeError; command timeouts and startup errors propagate.
+    """
     # Register each repository once and reject conflicting URLs for a shared name.
     repositories: dict[str, str] = {}
     for helm_chart in HELM_CHARTS:
@@ -111,6 +124,7 @@ def install_helm_charts() -> None:
 
 
 def main() -> None:
+    """Install configured Helm charts, propagating installation errors."""
     install_helm_charts()
 
 

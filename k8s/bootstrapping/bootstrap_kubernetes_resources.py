@@ -41,7 +41,11 @@ def create_parser() -> argparse.ArgumentParser:
 def run(*command: str,
         input_text: str | None = None,
         print_stdout: bool = True) -> subprocess.CompletedProcess[str]:
-    """Run a command, display its output, and raise a useful error on failure."""
+    """Run a command with optional stdin and return its captured text output.
+
+    print_stdout controls display only; stdout remains available in the result.
+    Raise RuntimeError for a nonzero exit status; process startup errors propagate.
+    """
     print(f"$ {' '.join(command)}")
     result = subprocess.run(
         command,
@@ -131,7 +135,11 @@ def choose_overlay(overlays):
 
 
 def apply_kustomization(kustomization_dir):
-    """Render and apply a Kustomize target using server-side apply."""
+    """Render a Kustomize directory and apply it server-side, forcing conflicts.
+
+    Conflicting fields are taken over from other field managers. Command failures
+    raise RuntimeError; process startup errors propagate.
+    """
     build = run(
         "kubectl",
         "kustomize",
