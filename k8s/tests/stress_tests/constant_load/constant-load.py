@@ -8,7 +8,7 @@ from urllib.request import Request, urlopen
 
 
 request_interval_seconds = int(os.environ["REQUEST_INTERVAL_MS"]) / 1000
-n_requests = float(os.environ["N_REQUESTS"])
+n_requests = int(os.environ["N_REQUESTS"])
 if not math.isfinite(request_interval_seconds) or request_interval_seconds <= 0:
     raise ValueError("REQUEST_INTERVAL_MS must be a positive integer")
 if not math.isfinite(n_requests) or n_requests <= 0:

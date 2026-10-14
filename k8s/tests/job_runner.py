@@ -10,9 +10,15 @@ DATABASE = "alerts"
 REDIS_STREAM = "alerts"
 REDIS_GROUP = "workers"
 POLL_INTERVAL_SECONDS = 2
+COMMAND_TIMEOUT_SECONDS = 120
+KUBECTL_WAIT_GRACE_SECONDS = 30
 
 
-def kubectl(*args: str, capture_output: bool = False) -> str:
+def kubectl(
+    *args: str,
+    capture_output: bool = False,
+    timeout_seconds: int = COMMAND_TIMEOUT_SECONDS,
+) -> str:
     """Run kubectl, printing diagnostics and re-raising command failures.
 
     Return stripped stdout when capturing; otherwise print output and return "".
@@ -20,7 +26,13 @@ def kubectl(*args: str, capture_output: bool = False) -> str:
     command = ["kubectl", *args]
     print(f"$ {' '.join(command)}", flush=True)
     try:
-        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        result = subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
     except subprocess.CalledProcessError as error:
         if error.stdout:
             print("stdout:", file=sys.stderr)
@@ -98,7 +110,8 @@ def run_job_and_check_alerts(*,
             kubectl("wait", "-n", NAMESPACE,
                 "--for=condition=complete",
                 f"job/{job_name}",
-                f"--timeout={job_timeout_seconds}s")
+                f"--timeout={job_timeout_seconds}s",
+                timeout_seconds=job_timeout_seconds + KUBECTL_WAIT_GRACE_SECONDS)
             kubectl("logs", "-n", NAMESPACE, f"job/{job_name}")
         except subprocess.CalledProcessError:
             print("Job did not complete successfully; showing its logs.", file=sys.stderr)
@@ -146,3 +159,10 @@ def run_job_and_check_alerts(*,
             file=sys.stderr,
         )
         return error.returncode or 1
+    except subprocess.TimeoutExpired as error:
+        print(
+            f"Command timed out after {error.timeout} seconds: "
+            f"{' '.join(error.cmd)}",
+            file=sys.stderr,
+        )
+        return 1
