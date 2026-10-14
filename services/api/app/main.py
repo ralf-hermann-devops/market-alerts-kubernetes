@@ -65,11 +65,11 @@ stream_name = os.getenv("REDIS_STREAM", "alerts")
 logger.info("API configured; Redis stream=%s", stream_name)
 
 
+
 @app.middleware("http")
 async def record_http_metrics(
     request: Request,
-    call_next: RequestResponseEndpoint,
-) -> Response:
+    call_next: RequestResponseEndpoint) -> Response:
     """Return the downstream response while counting and timing non-metrics requests.
 
     Record elapsed seconds until call_next returns or raises, using the matched
@@ -77,22 +77,44 @@ async def record_http_metrics(
     propagate after being counted with status 500. Requests to /metrics bypass
     instrumentation.
     """
+    
+    # Exclude the metrics endpoint to avoid monitoring its own requests.    
     if request.url.path == "/metrics":
         return await call_next(request)
 
     start_time = time.perf_counter()
     status_code = 500
+
+    allowed_method_routes = {
+        ("POST", "/webhook/tradingview"),
+    }
+
     try:
         response = await call_next(request)
         status_code = response.status_code
         return response
     finally:
+        # Resolve the matched route after call_next, since routing may not
+        # have happened before it. Use the route template, not the raw URL,
+        # to avoid creating separate metrics for variable path parameters.
+        # Templates are not in use yet but this best practice is implemented
+        # in case this changes later
         route = request.scope.get("route")
         path = route.path if route is not None else "unmatched"
-        http_requests.labels(request.method, path, str(status_code)).inc()
-        http_request_duration.labels(request.method, path).observe(
+        method = request.method
+
+        # Normalize unexpected method/path combinations to limit metric
+        # cardinality and prevent unbounded memory usage from too many 
+        # recived unique labels (accidental or intentionally malicious)
+        if (method, path) not in allowed_method_routes:
+            method = "OTHER"
+            path = "INVALID"
+        http_requests.labels(method, path, str(status_code)).inc()
+        http_request_duration.labels(method, path).observe(
             time.perf_counter() - start_time
         )
+
+
 
 
 class Alert(BaseModel):

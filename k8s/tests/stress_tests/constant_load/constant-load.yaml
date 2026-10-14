@@ -13,9 +13,9 @@ spec:
           command: ["python", "-u", "/scripts/constant-load.py"]
           env:
             - name: REQUEST_INTERVAL_MS
-              value: "50"
-            - name: DURATION_SECONDS
-              value: "120"
+              value: "200"
+            - name: N_REQUESTS
+              value: "3000"
             - name: WEBHOOK_SECRET
               valueFrom:
                 secretKeyRef:

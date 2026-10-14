@@ -1,121 +1,21 @@
-import subprocess
-import sys
-import time
 from pathlib import Path
+import sys
 
-NAMESPACE = "trading-alerts"
-DATABASE_POD = "postgres-0"
-DATABASE = "alerts"
-KUSTOMIZATION = Path(__file__).resolve().parent
-JOB_NAME = "simple-passthrough"
-JOB_TIMEOUT_SECONDS = 120
-DATABASE_TIMEOUT_SECONDS = 30
-POLL_INTERVAL_SECONDS = 2
+TESTS_DIRECTORY = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(TESTS_DIRECTORY))
 
-
-def kubectl(*args: str, capture_output: bool = False) -> str:
-    """Run kubectl, printing diagnostics and re-raising command failures.
-
-    Return stripped stdout when capturing; otherwise print output and return "".
-    """
-    command = ["kubectl", *args]
-    print(f"$ {' '.join(command)}", flush=True)
-    try:
-        result = subprocess.run(command, check=True, capture_output=True, text=True)
-    except subprocess.CalledProcessError as error:
-        if error.stdout:
-            print("stdout:", file=sys.stderr)
-            print(error.stdout, end="", file=sys.stderr)
-        if error.stderr:
-            print("stderr:", file=sys.stderr)
-            print(error.stderr, end="", file=sys.stderr)
-        raise
-
-    if not capture_output:
-        if result.stdout:
-            print(result.stdout, end="")
-        if result.stderr:
-            print(result.stderr, end="", file=sys.stderr)
-    return result.stdout.strip() if capture_output else ""
-
-
-def alert_count() -> int:
-    """Query PostgreSQL through kubectl and return the number of stored alerts."""
-    result = kubectl("exec", "-n", NAMESPACE, DATABASE_POD, "--", "psql", "-U", "app", "-d", DATABASE, "-tA",
-                     "-c", "SELECT COUNT(*) FROM alerts;", capture_output=True)
-    return int(result)
-
-
-def show_job_logs(job_name: str) -> None:
-    """Print logs for the named Job in the application namespace."""
-    kubectl("logs", "-n", NAMESPACE, f"job/{job_name}")
+from job_runner import run_job_and_check_alerts
 
 
 def main() -> int:
-    """Send a test webhook via a Job and check for a new database row.
-
-    Return zero when the row count increases, or a nonzero status on failure.
-    """
-    try:
-        # Record the baseline before sending the test alert.
-        before_count = alert_count()
-        print(f"Alert rows before test: {before_count}")
-
-        # Recreate the fixed-name Job so each run executes a fresh test pod.
-        kubectl("delete", "job", JOB_NAME,
-            "-n", NAMESPACE,
-            "--ignore-not-found=true")
-        kubectl("apply", "-k", str(KUSTOMIZATION))
-
-        try:
-            kubectl("wait", "-n", NAMESPACE,
-                "--for=condition=complete", f"job/{JOB_NAME}",
-                f"--timeout={JOB_TIMEOUT_SECONDS}s")
-            show_job_logs(JOB_NAME)
-        except subprocess.CalledProcessError:
-            print("Job did not complete successfully; showing its logs.", file=sys.stderr)
-            show_job_logs(JOB_NAME)
-            return 1
-            
-
-        # Read from job config how many requests were sent
-        n_requests_str = kubectl("get", "job", JOB_NAME, "-n", NAMESPACE,
-                "-o=jsonpath='{.spec.template.spec.containers[0].env[?(@.name==\"REQUEST_COUNT\")].value}'",
-                capture_output=True)[1:-1] # the number comes wrapped in quotes e.g. '5'
-        n_requests = int(n_requests_str)
-
-
-        # The worker writes asynchronously, so poll for the expected new row.
-        deadline = time.monotonic() + DATABASE_TIMEOUT_SECONDS
-        after_count = alert_count()
-        test_successful = False
-        while not test_successful and time.monotonic() < deadline:
-            after_count = alert_count()
-            test_successful = after_count == before_count + n_requests
-            time.sleep(POLL_INTERVAL_SECONDS)
-
-        # Fail if the Job completed but the alert was not persisted.
-        if test_successful:
-            print(f"Database row count increased by {after_count - before_count}.")
-            return 0
-        else:
-            print("The API test Job completed, but not all new alert row appeared "
-                   f"within {DATABASE_TIMEOUT_SECONDS} seconds."
-                   f"Expected increase: {n_requests}; actuall increase: {after_count}",
-                   file=sys.stderr)
-            return 1
-
-        
-    except FileNotFoundError as error:
-        print(f"Required command not found: {error.filename}", file=sys.stderr)
-        return 1
-    except subprocess.CalledProcessError as error:
-        print(
-            f"Command failed with exit code {error.returncode}: "
-            f"{' '.join(error.cmd)}",
-            file=sys.stderr,
-        )
-        return error.returncode or 1
+    """Run the passthrough Job and verify its alerts were persisted."""
+    return run_job_and_check_alerts(
+        job_name="simple-passthrough",
+        kustomization=Path(__file__).resolve().parent,
+        request_count_env="REQUEST_COUNT",
+        job_timeout_seconds=120,
+        database_timeout_seconds=30
+    )
 
 
 if __name__ == "__main__":
