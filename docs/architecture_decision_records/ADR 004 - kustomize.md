@@ -20,8 +20,8 @@ Use Kustomize to manage Kubernetes manifests. Keep the shared configuration in a
 
 
 ## Implementation
-- Separation of kubernetes yaml files into base and overlay
-- Helm will still be used to install external charts like monitoring into the cluster
+- Keep application Kubernetes YAML in a Kustomize base and environment-specific changes in overlays.
+- Install external charts, including KEDA and kube-prometheus-stack, through the centralized `k8s/bootstrapping/helm_charts_setup/install_helm_charts.py` script. Pin chart versions there and keep chart-specific values files optional.
 
 ## When to Revisit This Decision
 - If the project later needs more complex packaging, parameterization, or release management, Helm can be reconsidered.

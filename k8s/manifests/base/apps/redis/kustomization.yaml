@@ -6,3 +6,5 @@ namespace: trading-alerts
 resources:
   - deployment.yaml
   - service.yaml
+  - metrics-service.yaml
+  - service-monitor.yaml

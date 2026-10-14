@@ -8,7 +8,7 @@
   - [Skip if not testing Kubernetes manifests](#skip-if-not-testing-kubernetes-manifests)
   - [Validating manifests](#validating-manifests)
     - [Scan individual source manifests](#scan-individual-source-manifests)
-    - [Build, scan and apply the shared and overlay infrastructure](#build-scan-and-apply-the-shared-and-overlay-infrastructure)
+    - [Install Helm charts and apply the sealed-secrets controller](#install-helm-charts-and-apply-the-sealed-secrets-controller)
     - [Build, scan and apply the project manifests](#build-scan-and-apply-the-project-manifests)
   - [Run tests on the active cluster](#run-tests-on-the-active-cluster)
 - [Other checks](#other-checks)
@@ -49,7 +49,7 @@ The API smoke test checks health, readiness, and valid and invalid webhooks. The
 You can deploy the infrastructure and selected application overlay directly with the bootstrap script described in the [Kubernetes section of the README](../../readme.md#kubernetes-in-minikube-or-kind).
 
 ### Validating manifests
-CI uses Kubeconform to check Kubernetes resource schemas: required fields, field values and types, and (with strict mode) unknown fields and duplicate YAML keys. Install Kubeconform 0.8.0, plus `kubectl` and Helm for the infrastructure target. From the repository root, run the following in Bash, Git Bash, or WSL. See the [Kubernetes manifest validation note](../engineering_notes/kubernetes-manifest-validation.md) for details.
+CI uses Kubeconform to check Kubernetes resource schemas: required fields, field values and types, and (with strict mode) unknown fields and duplicate YAML keys. Install Kubeconform 0.8.0, `kubectl`, and Helm 3.17 or newer. Helm is required to install the configured charts; `--take-ownership` lets KEDA adopt resources from earlier Kustomize-based installs. From the repository root, run the following in Bash, Git Bash, or WSL. See the [Kubernetes manifest validation note](../engineering_notes/kubernetes-manifest-validation.md) for details.
 
 Set the Kubeconform arguments and a regex to exclude patch files and Kustomization manifests from the scan:
 ```bash
@@ -66,29 +66,23 @@ PATCH_EXCLUSIONS='(?i)(^|[\\/])([^\\/]*patch[^\\/]*|kustomization\.yaml)$'
 
 #### Scan individual source manifests.
 ```bash
-kubeconform "${KUBECONFORM_ARGS[@]}" -ignore-filename-pattern "$PATCH_EXCLUSIONS" k8s/manifests/infrastructure
 kubeconform "${KUBECONFORM_ARGS[@]}" -ignore-filename-pattern "$PATCH_EXCLUSIONS" k8s/manifests/base
 kubeconform "${KUBECONFORM_ARGS[@]}" -ignore-filename-pattern "$PATCH_EXCLUSIONS" k8s/manifests/overlays/on-premise
 ```
 
 <br/>
 
-#### Build, scan and apply the shared and overlay infrastructure
+#### Install Helm charts and apply the sealed-secrets controller
 
-Before validating the base and on-premise overlay, deploy the infrastructure components to the cluster. For rendering the KEDA chart enable Helm and apply the infrastructure manifests. 
+Before applying the application overlay, install KEDA and kube-prometheus-stack so their custom resource definitions exist. The stack installs Prometheus, Grafana, and Kubernetes exporters with the chart's default settings. The bootstrap script performs these steps automatically. To install the configured Helm charts separately:
 
-<br/>
-
-Shared infrastructure:
 ```bash
-kubectl kustomize --enable-helm k8s/manifests/infrastructure > infrastructure.yaml
-kubeconform "${KUBECONFORM_ARGS[@]}" infrastructure.yaml
-kubectl apply -f infrastructure.yaml
+python k8s/bootstrapping/helm_charts_setup/install_helm_charts.py
 ```
 
-<br/>
+Each chart can optionally set `values_file` in `install_helm_charts.py`; when set, that path is passed to Helm with `--values`. Paths are interpreted relative to the working directory used to run the installer. For dashboard access and monitoring queries, see the [Kubernetes monitoring guide](./kubernetes-monitoring.md).
 
-On-premise sealed secret installation
+Install the on-premise Sealed Secrets controller:
 
 ```bash
 kubectl kustomize k8s/manifests/overlays/on-premise/sealed_secrets_install > sealed_secrets_install.yaml
@@ -98,10 +92,9 @@ kubectl apply -f sealed_secrets_install.yaml
 
 <br/>
 
-Wait for CRDs and the SealedSecrets controller to be ready. More about that in the [secret-bootstrap-flow guide](./secret-bootstrap-flow.md).
+Wait for the SealedSecrets CRD and controller to be ready. More about that in the [secret-bootstrap-flow guide](./secret-bootstrap-flow.md).
 
 ```bash
-kubectl wait --for=condition=Established crd/scaledobjects.keda.sh --timeout=120s
 kubectl wait --for=condition=Established crd/sealedsecrets.bitnami.com --timeout=120s
 kubectl rollout status deployment/sealed-secrets-controller --namespace kube-system --timeout=120s
 ```

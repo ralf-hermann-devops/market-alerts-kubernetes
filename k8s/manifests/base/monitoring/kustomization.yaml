@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+# https://github.com/grafana-community/helm-charts/blob/56889e94f672d58ac9c803bb2b029fb7273f57f9/charts/grafana/README.md?plain=1#L225
+# https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack#high-level-overview-of-changes
+# https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/values.yaml#L1565
+# Sidecar in graphana pod looks for configmaps with a label grafana_dashboard=1 (or otherwise configured in values.yaml)
+# and load dashboards based on contained json
+
+configMapGenerator:
+  - name: market-alerts-api-dashboard
+    files:
+      - api-dashboard.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+      disableNameSuffixHash: true

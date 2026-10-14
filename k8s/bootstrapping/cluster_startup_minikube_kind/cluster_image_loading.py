@@ -4,7 +4,12 @@ from collections.abc import Callable
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-IMAGES = ("trading-api:dev", "trading-worker:dev", "trading-fetcher:dev")
+IMAGES = (
+    "trading-api:dev",
+    "trading-worker:dev",
+    "trading-fetcher:dev",
+    "trading-redis-exporter:dev",
+)
 
 
 def run(command: list[str]) -> None:
@@ -27,8 +32,9 @@ def output(command: list[str]) -> str:
 
 
 def build_images() -> None:
-    """Build the API, worker, and fetcher images using Docker Compose."""
-    run(["docker", "compose", "-f", "Dockercompose.yaml", "build", "api", "worker", "fetcher"])
+    """Build application and Redis exporter images using Docker Compose."""
+    run(["docker", "compose", "-f", "Dockercompose.yaml", "build",
+         "api", "worker", "fetcher", "redis-exporter"])
 
 
 def select_existing_clusters(platform: str, clusters: list[str]) -> list[str] | None:

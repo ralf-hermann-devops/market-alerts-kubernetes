@@ -21,9 +21,9 @@ The services are packaged with Docker, and the project supports both local Kuber
 
 TradingView sends alerts to the API, which validates each alert's shared secret and publishes valid alerts to a Redis stream. The worker consumes that stream and persists alerts to PostgreSQL. Independently, the market-data fetcher periodically retrieves candle data from Yahoo Finance and stores it in PostgreSQL.
 
-The same services can run locally with Docker Compose or be deployed to Kubernetes. In Kubernetes, ingress routes webhook requests to the API, network policies constrain service access to Redis and PostgreSQL, and KEDA scales the worker based on Redis stream lag and CPU utilization.
+The same services can run locally with Docker Compose or be deployed to Kubernetes. In Kubernetes, ingress routes webhook requests to the API, network policies constrain service access to Redis and PostgreSQL, KEDA scales the worker based on Redis stream lag and CPU utilization, and the bootstrap installs kube-prometheus-stack for monitoring.
 
-![Architecture overview showing the local Docker Compose and Kubernetes deployments](docs/images/architecture_overview.png)
+![Application architecture overview showing the local Docker Compose and Kubernetes deployments; external observability components are omitted](docs/images/architecture_overview.png)
 
 
 ## Project structure
@@ -34,8 +34,8 @@ The same services can run locally with Docker Compose or be deployed to Kubernet
     - `services/fetcher/` — retrieves market candle data and stores it in PostgreSQL.
     - `services/db/` — database initialization scripts.
 - `k8s/` — everything needed to deploy and test the application on Kubernetes
-    - `k8s/manifests/` — Kustomize resources for Kubernetes applications, environment overlays, and supporting infrastructure.
-    - [`k8s/bootstrapping/`](k8s/bootstrapping/) — scripts to bootstrap a Kubernetes cluster with Sealed Secrets and create the encrypted manifest, plus image build-and-load helpers for Minikube and kind.
+    - `k8s/manifests/` — Kustomize resources for Kubernetes applications and environment overlays.
+    - [`k8s/bootstrapping/`](k8s/bootstrapping/) — scripts to install configured Helm charts, bootstrap Sealed Secrets and create the encrypted manifest, plus image build-and-load helpers for Minikube and kind.
     - `k8s/tests/` — tests to exercise the application in a deployed Kubernetes cluster.
 - `docs/` — project notes and architecture decision records.
     - See [`docs/architecture_decision_records/`](docs/architecture_decision_records/) for decisions about Redis, PostgreSQL, secrets, Kustomize, and staged deployment
@@ -44,6 +44,7 @@ The same services can run locally with Docker Compose or be deployed to Kubernet
     - See `docs/guides/` for guides and deep dives about certain aspects of the repository, including:
         - [`docs/guides/secret-bootstrap-flow.md`](docs/guides/secret-bootstrap-flow.md) — describes in detail how thet bootstraping of a Sealed Secrets works
         - [`docs/guides/local-testing.md`](docs/guides/local-testing.md) — describes how to run unit tests, Docker-based integration tests, and Kubernetes cluster tests.
+        - [`docs/guides/kubernetes-monitoring.md`](docs/guides/kubernetes-monitoring.md) — describes the Kubernetes monitoring stack and Grafana dashboards.
 
 ## Sending TradingView webhook alerts
 
@@ -97,19 +98,19 @@ or
 python k8s/bootstrapping/minikube_kind/kind_build_and_load_images.py
 ```
 
-To bootstrap a cluster, make sure `kubectl` points at the target cluster and both `kubectl` and `kubeseal` are available on your system's `PATH`.
+To bootstrap a cluster, make sure `kubectl` points at the target cluster and `kubectl`, `kubeseal`, and Helm 3.17 or newer are available on your system's `PATH`.
 Then run:
 
 ```bash
 python k8s/bootstrapping/bootstrap_kubernetes_resources.py
 ```
 
-The bootstrap script installs the Sealed Secrets controller, prompts for the application secret values, writes the encrypted SealedSecret manifest, and applies the selected overlay.
+The bootstrap script installs KEDA and kube-prometheus-stack from pinned Helm charts, installs the Sealed Secrets controller, prompts for application secret values, writes the encrypted SealedSecret manifest, and applies the selected overlay.
 See the [secret bootstrap and deployment diagram](docs/guides/secret-bootstrap-flow.md) for the sequence and where decryption occurs.
 
 ## CI/CD and local testing
 
-The `application-ci.yml` workflow runs on pushes and pull requests that change files under `services/`, `Dockercompose.yaml`, or the workflow itself. It runs Ruff over the Python services, audits each service's Python dependencies, builds and scans the API, worker, and fetcher images for HIGH and CRITICAL vulnerabilities, and runs the API unit tests plus the Docker-based worker smoke and API-to-worker integration tests.
+The `application-ci.yml` workflow runs on pushes and pull requests that change files under `services/`, `k8s/`, `Dockercompose.yaml`, or the workflow itself. It runs Ruff over the Python services, audits each service's Python dependencies, builds and scans the API, worker, and fetcher images for HIGH and CRITICAL vulnerabilities, runs the API unit tests plus the Docker-based worker smoke and API-to-worker integration tests, validates the base and on-premise Kubernetes manifests, and runs Kubernetes deployment smoke tests.
 
 The Docker-based test scripts honor `COMPOSE_NO_REBUILD_IN_TESTS=1`. CI sets it so the tests reuse the service images built earlier in the test job. When run locally without that variable, the scripts build images as needed.
 
@@ -121,6 +122,7 @@ For instructions covering local application unit tests, Docker smoke and integra
 
 The FastAPI endpoint validates TradingView alerts and their shared secret, then publishes accepted alerts to a Redis stream. A separate worker consumes the stream and writes alerts to PostgreSQL, while the market-data fetcher retrieves candles with yfinance and stores them in the same database.
 
+- **API metrics:** The API exposes Prometheus-formatted request counts and request-duration histograms at `/metrics`. The histogram uses finer bucket boundaries below 10 ms to distinguish the API's fast requests, plus wider buckets for slower outliers. Metrics use HTTP method, route template, and response status labels; the metrics scrape itself is excluded. The current Ingress only routes the webhook path, so `/metrics` is not externally exposed.
 - **Application services:** Pydantic validates webhook data, redis-py and Psycopg connect the API and worker to Redis and PostgreSQL.
-- **Local and cluster deployment:** Docker Compose runs the services locally. Kubernetes manifests use Kustomize overlays, with NetworkPolicies restricting service access, Sealed Secrets for application credentials, and KEDA to scale the worker from queue load and CPU.
+- **Local and cluster deployment:** Docker Compose runs the services locally. Kubernetes manifests use Kustomize overlays, with NetworkPolicies restricting service access, Sealed Secrets for application credentials, KEDA to scale the worker from queue load and CPU, and kube-prometheus-stack for Kubernetes and application monitoring.
 - **Checks in CI:** pytest covers API behavior and Docker-based tests exercise the worker and API-to-worker flow. Ruff runs linting, pip-audit does dependency audits, and Trivy image scans provide additional vulnerability checks.

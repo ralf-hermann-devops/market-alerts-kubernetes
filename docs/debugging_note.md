@@ -24,7 +24,7 @@ Duplicated and inconsistent service configuration made it difficult to connect t
 
 Applying application resources before their custom resource definitions (CRDs) were established could fail because Kubernetes did not yet recognize kinds such as KEDA's `ScaledObject`.
 
-**Solution:** Split bootstrap into stages. First install supporting infrastructure, including KEDA and Sealed Secrets, and wait for their CRDs to be established. Only then apply application resources that use those custom resource kinds.
+**Solution:** Split bootstrap into stages. First install the configured external Helm charts (currently KEDA and kube-prometheus-stack), then install the selected overlay's Sealed Secrets controller. Wait for the chart and Sealed Secrets CRDs to be established before applying application resources that use those custom resource kinds.
 
 **Debugging takeaway:** If Kubernetes reports an unknown resource kind, check that the corresponding CRD exists and is established before investigating the application resource.
 

@@ -11,15 +11,13 @@ Name Kustomize patch files with `patch` in the filename, for example `secret-env
 
 ## CI validation details
 
-The `kubernetes-manifests-validation` job in `.github/workflows/application-ci.yml` checks the infrastructure target, the base, and the `on-premise` overlay. Kubeconform checks each target's source manifests, while `kubectl kustomize` separately builds each target so the assembled output can also be validated.
+The `kubernetes-manifests-validation` job in `.github/workflows/application-ci.yml` checks the base and the `on-premise` overlay. Kubeconform checks each target's source manifests, while `kubectl kustomize` separately builds each target so the assembled output can also be validated.
 
 ### Validation scope
 
 The scan lints the Kubernetes resources in each Kustomize target. It reports values with incorrect types, invalid field values, and missing fields required by the resource schema. The `-strict` option also reports unknown fields and duplicate YAML keys.
 
-The base is checked independently of overlays because an overlay may omit some base manifests; validating it separately ensures the base is valid on its own. The external infrastructure target is also checked so manual changes to those manifests are covered.
-
-Kustomize's Helm support is enabled for the infrastructure target because KEDA is installed through a Helm chart there. The other targets do not require the Helm option.
+The base is checked independently of overlays because an overlay may omit some base manifests; validating it separately ensures the base is valid on its own. KEDA and kube-prometheus-stack are installed directly from Helm repositories by the bootstrap script rather than rendered as Kustomize targets, so their chart templates are outside this manifest-validation job. The ServiceMonitor custom resource is checked using the external CRD catalog.
 
 ### Kubeconform schemas and exclusions
 
@@ -35,6 +33,6 @@ The individual scan excludes `kustomization.yaml` because it is Kustomize config
 
 ### Build and combined manifest scan
 
-Building each target with `kubectl kustomize` catches composition errors that kubeconform's schema checks do not detect, including invalid resource references, patch targets, and Helm rendering failures. This build also produces the final YAML that is passed to kubeconform.
+Building each target with `kubectl kustomize` catches composition errors that kubeconform's schema checks do not detect, including invalid resource references, patch targets, and generator or transformer issues. This build also produces the final YAML that is passed to kubeconform.
 
 Kubeconform then scans the combined manifest to validate what Kustomize actually produces, including the effects of patches, generators, and transformations.

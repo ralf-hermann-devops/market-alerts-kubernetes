@@ -11,5 +11,6 @@ resources:
   - apps/postgres
   - apps/redis
   - apps/worker
-  
+
+  - monitoring
   - security/network-policies.yaml

@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: constant-load
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: python-test
+          image: python:3.14-alpine
+          command: ["python", "-u", "/scripts/constant-load.py"]
+          env:
+            - name: REQUEST_INTERVAL_MS
+              value: "200"
+            - name: N_REQUESTS
+              value: "3000"
+            - name: WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: trading-alerts-secrets
+                  key: webhook-secret
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+              readOnly: true
+      volumes:
+        - name: script
+          configMap:
+            name: constant-load-script

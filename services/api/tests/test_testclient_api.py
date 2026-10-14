@@ -76,6 +76,53 @@ def test_webhook_rejects_invalid_secret(monkeypatch, caplog):
     assert "wrong-secret" not in caplog.text
 
 
+def test_metrics_reports_request_count_latency_and_errors(monkeypatch):
+    client = make_client(monkeypatch)
+    client.post(
+        "/webhook/tradingview",
+        json={
+            "secret": "dev-secret",
+            "symbol": "AAPL",
+            "action": "long",
+        },
+    )
+    client.post(
+        "/webhook/tradingview",
+        json={
+            "secret": "wrong-secret",
+            "symbol": "AAPL",
+            "action": "long",
+        },
+    )
+
+    response = client.get("/metrics")
+    metrics = response.text
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    assert (
+        'http_requests_total{method="POST",path="/webhook/tradingview",status="202"} 1.0'
+        in metrics
+    )
+    assert (
+        'http_requests_total{method="POST",path="/webhook/tradingview",status="401"} 1.0'
+        in metrics
+    )
+    assert (
+        'http_request_duration_seconds_count{method="POST",path="/webhook/tradingview"} 2.0'
+        in metrics
+    )
+    assert (
+        'http_request_duration_seconds_bucket{le="0.001",method="POST",path="/webhook/tradingview"}'
+        in metrics
+    )
+    assert (
+        'http_request_duration_seconds_bucket{le="0.003",method="POST",path="/webhook/tradingview"}'
+        in metrics
+    )
+    assert 'path="/metrics"' not in metrics
+
+
 if __name__ == "__main__":
     # pytest.main(...) returns success or failure but doesnt propagate
     # it as an exit code on its own
