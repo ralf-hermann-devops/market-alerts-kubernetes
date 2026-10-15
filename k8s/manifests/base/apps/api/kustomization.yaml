@@ -5,6 +5,7 @@ namespace: trading-alerts
 
 resources:
   - deployment.yaml
+  - https-redirect-middleware.yaml
   - service.yaml
   - service-monitor.yaml
   - ingress.yaml

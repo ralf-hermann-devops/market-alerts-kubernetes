@@ -63,7 +63,7 @@ Send an HTTP `POST` request to `/webhook/tradingview` with a JSON body. The `sec
 
 In TradingView, configure the alert message as this JSON and use the webhook URL for the running API. Supported action examples include `long`, `short`, and `close`.
 
-TradingView requires a publicly reachable HTTPS webhook URL, `localhost` and private cluster services won't work. For Kubernetes, an Ingress needs a running Ingress controller and an externally reachable IP or load balancer, plus DNS and TLS configuration. The Ingress resource alone does not provide internet access. For local testing, use a secure tunnel such as Cloudflare Tunnel or ngrok. Keep `WEBHOOK_SECRET` private.
+TradingView requires a publicly reachable HTTPS webhook URL; `localhost` and private cluster services will not work. The on-premise overlay configures HTTPS for the placeholder host `alerts.example.invalid` and redirects HTTP requests to HTTPS. It uses a local certificate authority, so it is suitable only for local testing after you trust that authority on the calling machine. For the required local hostname mapping, certificate trust steps, and the later public DNS/ACME setup, see [the HTTPS webhook guide](docs/guides/https-webhook.md). Keep `WEBHOOK_SECRET` private.
 
 
 ## Running the application stack locally

@@ -4,7 +4,9 @@ kind: Kustomization
 resources:
   # does not include sealed_secrets manifests because the have to be applied before these ones
   - ../../base
+  - local-tls.yaml
   - trading-alerts-sealedsecret.yaml
 
 patches:
   - path: secret-env-patch.yaml
+  - path: api-ingress-tls-patch.yaml

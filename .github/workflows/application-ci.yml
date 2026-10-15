@@ -264,6 +264,8 @@ jobs:
         run: python k8s/tests/smoke_tests/workload_controllers_started/run.py
       - name: Passthrough smoke test
         run: python k8s/tests/smoke_tests/simple_passthrough/run.py
+      - name: HTTPS webhook smoke test
+        run: python k8s/tests/smoke_tests/https_webhook/run.py
       - name: Constant-load stress test
         run: python k8s/tests/stress_tests/constant_load/run.py
       # Add  more deployment and smoke-test steps here
