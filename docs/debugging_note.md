@@ -54,3 +54,47 @@ The Docker-based test scripts were first used locally, where logs where just loo
 **Solution:** Make each test outcome affect the process exit status while still allowing the script to print useful diagnostics and clean up its containers. The worker smoke test records whether processing succeeded, prints expected versus actual results and worker logs on failure, performs cleanup in a `finally` block, and returns `1` for failure or `0` for success. Its entry point uses `raise SystemExit(main())` so that returned status reaches the shell. The API-to-worker integration test raises an assertion when the HTTP response or persisted event is incorrect, its `finally` block still tears down the Compose project.
 
 **Debugging takeaway:** A failure message is for people (and supporting AI) to look at and evaluate what happened. A nonzero process exit status is what makes CI fail. Test scripts should report what went wrong and preserve cleanup, then return a failing status or let an exception propagate.
+
+
+## 7. Diagnosing KEDA scaling and Redis Stream backlog
+
+If KEDA cannot reach Redis, the Worker may not scale up even as messages pile up. Make sure the Redis address resolves from the `keda` namespace and that NetworkPolicy allows the KEDA operator to connect on port `6379`. Configure the scaler with `host` and `port`.
+
+**Solution:** Check the ScaledObject's `Ready` and `Active` conditions, whether its HPA exists, and recent KEDA operator logs before changing thresholds:
+
+```bash
+kubectl describe scaledobject worker-redis-streams -n trading-alerts
+kubectl get hpa -n trading-alerts
+kubectl logs -n keda deployment/keda-operator --since=10m
+```
+
+For timeouts, check the fully qualified Redis Service name and the NetworkPolicy selectors. A test pod that gets `NOAUTH` from Redis confirms network access, but not that the scaler's credentials are correct.
+
+If the backlog keeps growing, check unread messages, pending work, Worker progress, and incoming request rate:
+
+```bash
+kubectl exec -n trading-alerts deployment/redis -c redis -- sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --json XINFO GROUPS alerts'
+```
+Output will be in JSON format, showing the unread (lag) and pending message count and other group details.
+
+```json
+[{"name":"workers","consumers":2,"pending":0,"last-delivered-id":"1791997582095-0","entries-read":3000,"lag":0}]
+```
+<br/>
+
+```bash
+kubectl logs -n trading-alerts deployment/worker --all-pods=true --since=10m
+```
+```bash
+kubectl get hpa -n trading-alerts
+```
+
+Worker logs show whether processing is progressing, and the HPA shows whether KEDA has reached its replica limit. To estimate incoming requests per second, check the Grafana dashboard installed with the boostrapping deployment or query Prometheus directly with:
+
+```promql
+sum(rate(http_requests_total{path="/webhook/tradingview"}[5m]))
+```
+
+If the incoming rate exceeds aggregate Worker throughput, the backlog can keep growing even when KEDA is working correctly.
+
+**Debugging takeaway:** Check KEDA and Redis connectivity first, then look at unread messages, pending work, and Worker progress separately. This helps pinpoint what’s slowing the queue.

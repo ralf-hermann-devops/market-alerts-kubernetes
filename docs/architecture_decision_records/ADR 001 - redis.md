@@ -25,8 +25,8 @@ I will use Redis (Streams with consumer groups).
 - Redis runs without persistence. A small amount of data loss is acceptable and will be tolerated without extra handling
 - The worker acknowledges a message only after it has been stored in Postgres.
 - The worker reads stuck messages from the pending list. It discards and logs malformed messages and retries the others.
-- After a few failed attempts, a message is discarded for good and an error is logged.
-- The stream length is exported as a metric and displayed in Grafana.
+- KEDA reads Redis consumer-group lag and scales the Worker deployment. The Redis exporter sidecar independently reports unread lag, pending entries, and oldest outstanding message age to Prometheus through the `redis-metrics` Service.
+- Redis client traffic and Prometheus scraping use separate Services so the metrics endpoint is distinct from the Redis client endpoint.
 
 ## When to Revisit This Decision
 

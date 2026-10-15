@@ -46,6 +46,15 @@ HELM_CHARTS = (
         repository_name="headlamp",
         repository_url="https://kubernetes-sigs.github.io/headlamp/",
         namespace="monitoring",
+    ),
+    # Ingress controller
+    HelmChart(
+        release_name="traefik",
+        chart="traefik/traefik",
+        version="41.7.1",
+        repository_name="traefik",
+        repository_url="https://traefik.github.io/charts",
+        namespace="traefik",
     )
 )
 

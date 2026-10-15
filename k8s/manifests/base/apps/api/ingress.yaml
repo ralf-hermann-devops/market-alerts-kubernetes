@@ -4,7 +4,8 @@ metadata:
   name: api
   namespace: trading-alerts
 spec:
-  ingressClassName: nginx
+  # Standard NGINX Ingress controller was retired in March 2026
+  ingressClassName: traefik
   rules:
     - host: alerts.local
       http:
