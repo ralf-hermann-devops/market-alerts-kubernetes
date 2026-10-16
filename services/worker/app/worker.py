@@ -55,15 +55,19 @@ def parse_alert(fields: dict[str, Any]) -> dict[str, Any]:
 
     try:
         alert = json.loads(payload)
-    except (json.JSONDecodeError, TypeError, UnicodeDecodeError) as error:
+    except (ValueError, TypeError) as error:
         raise InvalidMessageError("payload is not valid JSON") from error
 
     if not isinstance(alert, dict):
         raise InvalidMessageError("payload must be a JSON object")
     if not isinstance(alert.get("symbol"), str):
         raise InvalidMessageError("symbol must be a string")
+    if "\x00" in alert["symbol"]:
+        raise InvalidMessageError("symbol must not contain NUL characters")
     if not isinstance(alert.get("action"), str):
         raise InvalidMessageError("action must be a string")
+    if "\x00" in alert["action"]:
+        raise InvalidMessageError("action must not contain NUL characters")
     if alert.get("price") is not None and (
         isinstance(alert["price"], bool) or not isinstance(alert["price"], (int, float))):
         raise InvalidMessageError("price must be a number or null")
@@ -71,6 +75,8 @@ def parse_alert(fields: dict[str, Any]) -> dict[str, Any]:
         raise InvalidMessageError("price must be finite")
     if alert.get("timeframe") is not None and not isinstance(alert["timeframe"], str):
         raise InvalidMessageError("timeframe must be a string or null")
+    if alert.get("timeframe") is not None and "\x00" in alert["timeframe"]:
+        raise InvalidMessageError("timeframe must not contain NUL characters")
 
     return alert
 

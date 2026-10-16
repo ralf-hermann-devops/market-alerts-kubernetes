@@ -1,3 +1,4 @@
+import json
 import unittest
 
 import psycopg
@@ -10,9 +11,15 @@ from services.worker.app.worker import (
 
 
 class FakeRedis:
-    def __init__(self, autoclaim_result: tuple, new_messages: list | None = None):
+    def __init__(
+        self,
+        autoclaim_result: tuple,
+        new_messages: list | None = None,
+        event_log: list[str] | None = None,
+    ):
         self.autoclaim_result = autoclaim_result
         self.new_messages = new_messages or []
+        self.event_log = event_log
         self.autoclaim_args = None
         self.readgroup_args = None
         self.xack_args = None
@@ -27,6 +34,8 @@ class FakeRedis:
 
     def xack(self, *args):
         self.xack_args = args
+        if self.event_log is not None:
+            self.event_log.append("xack")
 
 
 class ReadMessagesTests(unittest.TestCase):
@@ -131,6 +140,52 @@ class ProcessMessageTests(unittest.TestCase):
         self.assertEqual(db.calls, [])
         self.assertEqual(client.xack_args, ("alerts", "workers", "1-0"))
 
+    def test_large_integer_payload_is_logged_acked_and_not_written_to_database(self):
+        client = FakeRedis(("0-0", [], []))
+        db = FakeDatabase()
+        payload = '{"symbol":"AAPL","action":"long","price":' + "9" * 5000 + "}"
+
+        process_message(client, db, "alerts", "workers", "1-0", {"payload": payload})
+
+        self.assertEqual(db.calls, [])
+        self.assertEqual(client.xack_args, ("alerts", "workers", "1-0"))
+
+    def test_nul_in_alert_text_fields_is_logged_acked_and_not_written_to_database(self):
+        for field in ("symbol", "action", "timeframe"):
+            with self.subTest(field=field):
+                alert = {"symbol": "AAPL", "action": "long", "timeframe": "1m"}
+                alert[field] += "\x00"
+                client = FakeRedis(("0-0", [], []))
+                db = FakeDatabase()
+
+                process_message(
+                    client,
+                    db,
+                    "alerts",
+                    "workers",
+                    "1-0",
+                    {"payload": json.dumps(alert)},
+                )
+
+                self.assertEqual(db.calls, [])
+                self.assertEqual(client.xack_args, ("alerts", "workers", "1-0"))
+
+    def test_valid_message_commits_before_acknowledgment(self):
+        events = []
+        client = FakeRedis(("0-0", [], []), event_log=events)
+        db = FakeDatabase(event_log=events)
+
+        process_message(
+            client,
+            db,
+            "alerts",
+            "workers",
+            "1-0",
+            {"payload": '{"symbol":"AAPL","action":"long"}'},
+        )
+
+        self.assertEqual(events, ["execute", "commit", "xack"])
+
     def test_database_error_rolls_back_and_does_not_ack_message(self):
         client = FakeRedis(("0-0", [], []))
         db = FakeDatabase(execute_error=psycopg.OperationalError("database unavailable"))
@@ -150,19 +205,28 @@ class ProcessMessageTests(unittest.TestCase):
 
 
 class FakeDatabase:
-    def __init__(self, execute_error: Exception | None = None):
+    def __init__(
+        self,
+        execute_error: Exception | None = None,
+        event_log: list[str] | None = None,
+    ):
         self.execute_error = execute_error
+        self.event_log = event_log
         self.calls = []
         self.execute_args = None
 
     def execute(self, *args):
         self.calls.append("execute")
+        if self.event_log is not None:
+            self.event_log.append("execute")
         self.execute_args = args
         if self.execute_error:
             raise self.execute_error
 
     def commit(self):
         self.calls.append("commit")
+        if self.event_log is not None:
+            self.event_log.append("commit")
 
     def rollback(self):
         self.calls.append("rollback")
