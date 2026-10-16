@@ -67,6 +67,8 @@ def parse_alert(fields: dict[str, Any]) -> dict[str, Any]:
     if alert.get("price") is not None and (
         isinstance(alert["price"], bool) or not isinstance(alert["price"], (int, float))):
         raise InvalidMessageError("price must be a number or null")
+    if isinstance(alert.get("price"), float) and not math.isfinite(alert["price"]):
+        raise InvalidMessageError("price must be finite")
     if alert.get("timeframe") is not None and not isinstance(alert["timeframe"], str):
         raise InvalidMessageError("timeframe must be a string or null")
 
