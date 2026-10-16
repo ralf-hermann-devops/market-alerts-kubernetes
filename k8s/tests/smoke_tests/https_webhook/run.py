@@ -131,6 +131,13 @@ def main() -> int:
     """Forward Traefik HTTPS locally and verify the public webhook route."""
     port_forward = None
     try:
+        kubectl(
+            "wait", "--namespace", NAMESPACE,
+            "--for=condition=Ready",
+            "certificate/local-ca", "certificate/api-tls",
+            "--timeout=120s",
+            timeout_seconds=150,
+        )
         ca_certificate = secret_value("local-ca-key-pair", r"tls\.crt")
         webhook_secret = secret_value("trading-alerts-secrets", "webhook-secret")
         print(
