@@ -69,7 +69,7 @@ def read_messages(
             consumer,
             {stream_name: ">"},
             count=MESSAGE_BATCH_SIZE,
-            block=0 if pending_cursor != "0-0" else 5000,
+            block=1 if pending_cursor != "0-0" else 5000,
         ) or [],
     )
     messages = [message for _, entries in stream_messages for message in entries]
