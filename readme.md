@@ -9,7 +9,7 @@ The services are packaged with Docker, and the project supports both local Kuber
 - [General architecture](#general-architecture)
 - [Project structure](#project-structure)
 - [Sending TradingView webhook alerts](#sending-tradingview-webhook-alerts)
-- [Running locally](#running-locally)
+- [Running the application stack locally](#running-the-application-stack-locally)
   - [Docker Compose](#docker-compose)
   - [Kubernetes in minikube or kind](#kubernetes-in-minikube-or-kind)
 - [CI/CD and local testing](#cicd-and-local-testing)

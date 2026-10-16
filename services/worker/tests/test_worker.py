@@ -59,7 +59,7 @@ class ReadMessagesTests(unittest.TestCase):
             client.readgroup_args,
             (
                 ("workers", "worker-1", {"alerts": ">"}),
-                {"count": 10, "block": 0},
+                {"count": 10, "block": 1},
             ),
         )
         self.assertIsNone(client.autoclaim_args)
@@ -75,6 +75,26 @@ class ReadMessagesTests(unittest.TestCase):
         self.assertEqual(cursor, "0-0")
         self.assertTrue(read_pending)
         self.assertEqual(client.readgroup_args[1]["block"], 5000)
+
+    def test_uses_short_read_timeout_between_pending_scan_pages(self):
+        client = FakeRedis(("7-0", [], []))
+
+        messages, cursor, read_pending = read_messages(
+            client, "alerts", "workers", "worker-1", "2-0", True
+        )
+
+        self.assertEqual(messages, [])
+        self.assertEqual(cursor, "7-0")
+        self.assertFalse(read_pending)
+
+        messages, cursor, read_pending = read_messages(
+            client, "alerts", "workers", "worker-1", cursor, read_pending
+        )
+
+        self.assertEqual(messages, [])
+        self.assertEqual(cursor, "7-0")
+        self.assertTrue(read_pending)
+        self.assertEqual(client.readgroup_args[1]["block"], 1)
 
     def test_continues_pending_scan_after_unread_batch(self):
         pending = [("3-0", {"payload": "older"})]
