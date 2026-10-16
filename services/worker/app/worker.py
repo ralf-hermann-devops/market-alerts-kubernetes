@@ -8,8 +8,10 @@ import socket
 import time
 from typing import Any, cast
 
+
 import psycopg
 import redis
+
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -18,6 +20,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 CPU_LOAD_SECONDS = float(os.getenv("WORKER_CPU_LOAD_SECONDS", "0"))
+PENDING_MIN_IDLE_MS = 10_000
+MESSAGE_BATCH_SIZE = 10
 if not math.isfinite(CPU_LOAD_SECONDS) or CPU_LOAD_SECONDS < 0:
     raise ValueError("WORKER_CPU_LOAD_SECONDS must be a finite, non-negative number or not set at all.")
 
@@ -39,16 +43,53 @@ def simulate_cpu_load(duration_seconds: float) -> None:
     while time.monotonic() < deadline:
         value = (value * 6364136223846793005 + 1) & 0xFFFFFFFFFFFFFFFF  # keep number in 64 bit boundries to not consume too much memory
 
+
+def read_messages(
+    r: Any,
+    stream_name: str,
+    group: str,
+    consumer: str,
+    pending_cursor: str,
+    read_pending: bool,
+) -> tuple[list[tuple[str, dict[str, Any]]], str, bool]:
+    """Read one bounded batch, alternating between pending and unread entries."""
+    if read_pending:
+        next_cursor, pending_messages, _ = r.xautoclaim(
+            stream_name,
+            group,
+            consumer,
+            min_idle_time=PENDING_MIN_IDLE_MS,
+            start_id=pending_cursor,
+            count=MESSAGE_BATCH_SIZE,
+        )
+        return pending_messages, next_cursor, False
+
+    stream_messages = cast(
+        list[Any],
+        r.xreadgroup(
+            group,
+            consumer,
+            {stream_name: ">"},
+            count=MESSAGE_BATCH_SIZE,
+            block=0 if pending_cursor != "0-0" else 5000,
+        ) or [],
+    )
+    messages = [message for _, entries in stream_messages for message in entries]
+    return messages, pending_cursor, True
+
+
 def main():
     """Consume new Redis Stream alerts and persist them to PostgreSQL.
 
     Read connection settings from the environment and use the hostname as the
     consumer name. Ignore duplicate stream IDs on insertion and acknowledge each
-    message only after committing it. Pending messages are not reclaimed.
+    message only after committing it. Alternate batches of pending and unread
+    messages, reclaiming pending entries after 10 seconds of inactivity.
 
     Suppress Redis ResponseError during group creation. Configuration, connection,
     and message processing errors otherwise propagate, stopping the worker.
     """
+
     # Listen for a SIGTERM signal and shutdown gracefully in case of one being set
     running = True
     signal.signal(signal.SIGTERM, lambda *_: locals().update(running=False))
@@ -81,31 +122,34 @@ def main():
             host=os.environ["POSTGRES_HOST"],
             port=os.environ["POSTGRES_PORT"]) as db:
         logger.info("Connected to PostgreSQL; waiting for alerts")
+        pending_cursor = "0-0"
+        read_pending = True
         while running:
-            stream_messages = cast(list[Any], r.xreadgroup(group, consumer, {stream_name: ">"}, count=10, block=5000) or [])
-            for _, msgs in stream_messages:
-                for msg_id, fields in msgs:
-                    try:
-                        a = json.loads(fields["payload"])
-                        logger.info("Processing alert stream_id=%s symbol=%s action=%s",
-                            msg_id, a.get("symbol", "unknown"), a.get("action", "unknown"))
+            msgs, pending_cursor, read_pending = read_messages(
+                r, stream_name, group, consumer, pending_cursor, read_pending
+            )
 
-                        
-                        simulate_cpu_load(CPU_LOAD_SECONDS)
+            for msg_id, fields in msgs:
+                try:
+                    a = json.loads(fields["payload"])
+                    logger.info("Processing alert stream_id=%s symbol=%s action=%s",
+                        msg_id, a.get("symbol", "unknown"), a.get("action", "unknown"))
 
-                        db.execute(
-                            "INSERT INTO alerts (stream_id, symbol, action, price, timeframe) "
-                            "VALUES (%s,%s,%s,%s,%s) ON CONFLICT (stream_id) DO NOTHING",
-                            (msg_id, a["symbol"], a["action"], a.get("price"), a.get("timeframe")))
-                        db.commit()
-                        r.xack(stream_name, group, msg_id)      # ack only after the DB commit
+                    simulate_cpu_load(CPU_LOAD_SECONDS)
 
-                    except Exception:
-                        logger.exception("Failed processing alert stream_id=%s", msg_id)
-                        raise
-                    logger.info("Processed and acknowledged alert " \
-                                "stream_id=%s symbol=%s action=%s price=%s timeframe=%s",
-                            msg_id, a["symbol"], a["action"], a.get("price"), a.get("timeframe"))
+                    db.execute(
+                        "INSERT INTO alerts (stream_id, symbol, action, price, timeframe) "
+                        "VALUES (%s,%s,%s,%s,%s) ON CONFLICT (stream_id) DO NOTHING",
+                        (msg_id, a["symbol"], a["action"], a.get("price"), a.get("timeframe")))
+                    db.commit()
+                    r.xack(stream_name, group, msg_id)      # ack only after the DB commit
+
+                except Exception:
+                    logger.exception("Failed processing alert stream_id=%s", msg_id)
+                    raise
+                logger.info("Processed and acknowledged alert " \
+                            "stream_id=%s symbol=%s action=%s price=%s timeframe=%s",
+                    msg_id, a["symbol"], a["action"], a.get("price"), a.get("timeframe"))
 
     logger.info("Worker shut down")
 
