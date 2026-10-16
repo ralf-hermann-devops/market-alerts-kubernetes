@@ -8,10 +8,8 @@ import socket
 import time
 from typing import Any, cast
 
-
 import psycopg
 import redis
-
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
