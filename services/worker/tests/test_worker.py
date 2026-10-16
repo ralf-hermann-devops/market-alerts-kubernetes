@@ -1,6 +1,12 @@
 import unittest
 
-from services.worker.app.worker import PENDING_MIN_IDLE_MS, read_messages
+import psycopg
+
+from services.worker.app.worker import (
+    PENDING_MIN_IDLE_MS,
+    process_message,
+    read_messages,
+)
 
 
 class FakeRedis:
@@ -9,6 +15,7 @@ class FakeRedis:
         self.new_messages = new_messages or []
         self.autoclaim_args = None
         self.readgroup_args = None
+        self.xack_args = None
 
     def xautoclaim(self, *args, **kwargs):
         self.autoclaim_args = (args, kwargs)
@@ -17,6 +24,9 @@ class FakeRedis:
     def xreadgroup(self, *args, **kwargs):
         self.readgroup_args = (args, kwargs)
         return self.new_messages
+
+    def xack(self, *args):
+        self.xack_args = args
 
 
 class ReadMessagesTests(unittest.TestCase):
@@ -109,6 +119,53 @@ class ReadMessagesTests(unittest.TestCase):
         self.assertFalse(read_pending)
         self.assertEqual(client.autoclaim_args[1]["start_id"], "2-0")
         self.assertIsNone(client.readgroup_args)
+
+
+class ProcessMessageTests(unittest.TestCase):
+    def test_invalid_message_is_logged_acked_and_not_written_to_database(self):
+        client = FakeRedis(("0-0", [], []))
+        db = FakeDatabase()
+
+        process_message(client, db, "alerts", "workers", "1-0", {"payload": "{"})
+
+        self.assertEqual(db.calls, [])
+        self.assertEqual(client.xack_args, ("alerts", "workers", "1-0"))
+
+    def test_database_error_rolls_back_and_does_not_ack_message(self):
+        client = FakeRedis(("0-0", [], []))
+        db = FakeDatabase(execute_error=psycopg.OperationalError("database unavailable"))
+
+        with self.assertRaises(psycopg.OperationalError):
+            process_message(
+                client,
+                db,
+                "alerts",
+                "workers",
+                "1-0",
+                {"payload": '{"symbol":"AAPL","action":"long"}'},
+            )
+
+        self.assertEqual(db.calls, ["execute", "rollback"])
+        self.assertIsNone(client.xack_args)
+
+
+class FakeDatabase:
+    def __init__(self, execute_error: Exception | None = None):
+        self.execute_error = execute_error
+        self.calls = []
+        self.execute_args = None
+
+    def execute(self, *args):
+        self.calls.append("execute")
+        self.execute_args = args
+        if self.execute_error:
+            raise self.execute_error
+
+    def commit(self):
+        self.calls.append("commit")
+
+    def rollback(self):
+        self.calls.append("rollback")
 
 
 if __name__ == "__main__":
