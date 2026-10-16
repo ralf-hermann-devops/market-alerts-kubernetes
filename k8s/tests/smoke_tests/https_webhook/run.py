@@ -159,7 +159,11 @@ def main() -> int:
         alerts_before = alert_count()
         wait_for_port_forward(port_forward)
         send_webhook(ca_certificate, webhook_secret)
+        deadline = time.monotonic() + 60
         alerts_after = alert_count()
+        while alerts_after <= alerts_before and time.monotonic() < deadline:
+            time.sleep(1)
+            alerts_after = alert_count()
 
         # Check 2: Verify that the alert count increased after sending the webhook.
         if alerts_after <= alerts_before:

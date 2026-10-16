@@ -76,9 +76,10 @@ Before configuring TradingView, complete all of the following:
    `alerts.your-domain.example`.
 2. Create a public DNS record for that name pointing to the Internet-facing
    load balancer or ingress IP.
-3. Replace **both** occurrences of `alerts.example.invalid` in:
+3. Replace every occurrence of `alerts.example.invalid` in:
    - `k8s/manifests/base/apps/api/ingress.yaml`
    - `k8s/manifests/overlays/on-premise/local-tls.yaml`
+   - `k8s/manifests/overlays/on-premise/api-ingress-tls-patch.yaml`
 4. Replace the local issuer in `local-tls.yaml` with an ACME issuer such as a
    Let's Encrypt `ClusterIssuer`. Configure the issuer's notification email
    and HTTP-01 or DNS-01 challenge method.
