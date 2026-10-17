@@ -1,0 +1,43 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: local-selfsigned
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: local-ca
+  namespace: trading-alerts
+spec:
+  isCA: true
+  commonName: Market Alerts Local CA
+  secretName: local-ca-key-pair
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: local-selfsigned
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: local-ca
+  namespace: trading-alerts
+spec:
+  ca:
+    secretName: local-ca-key-pair
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: api-tls
+  namespace: trading-alerts
+spec:
+  secretName: api-tls
+  dnsNames:
+    - alerts.example.invalid
+  issuerRef:
+    group: cert-manager.io
+    kind: Issuer
+    name: local-ca

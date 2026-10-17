@@ -17,6 +17,7 @@ class HelmChart:
     crds_to_wait_for: tuple[str, ...] = ()
     take_ownership: bool = False
     values_file: Path | None = None
+    install_arguments: tuple[str, ...] = ()
 
 
 HELM_CHARTS = (
@@ -46,6 +47,29 @@ HELM_CHARTS = (
         repository_name="headlamp",
         repository_url="https://kubernetes-sigs.github.io/headlamp/",
         namespace="monitoring",
+    ),
+    HelmChart(
+        release_name="cert-manager",
+        chart="jetstack/cert-manager",
+        version="1.19.1",
+        repository_name="jetstack",
+        repository_url="https://charts.jetstack.io",
+        namespace="cert-manager",
+        crds_to_wait_for=(
+            "certificates.cert-manager.io",
+            "issuers.cert-manager.io",
+            "clusterissuers.cert-manager.io",
+        ),
+        install_arguments=("--set", "crds.enabled=true"),
+    ),
+    # Ingress controller
+    HelmChart(
+        release_name="traefik",
+        chart="traefik/traefik",
+        version="41.7.1",
+        repository_name="traefik",
+        repository_url="https://traefik.github.io/charts",
+        namespace="traefik",
     )
 )
 
@@ -114,6 +138,7 @@ def install_helm_charts() -> None:
             command.append("--take-ownership")
         if helm_chart.values_file is not None:
             command.extend(("--values", str(helm_chart.values_file)))
+        command.extend(helm_chart.install_arguments)
         run(*command)
 
 

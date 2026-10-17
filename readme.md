@@ -9,7 +9,7 @@ The services are packaged with Docker, and the project supports both local Kuber
 - [General architecture](#general-architecture)
 - [Project structure](#project-structure)
 - [Sending TradingView webhook alerts](#sending-tradingview-webhook-alerts)
-- [Running locally](#running-locally)
+- [Running the application stack locally](#running-the-application-stack-locally)
   - [Docker Compose](#docker-compose)
   - [Kubernetes in minikube or kind](#kubernetes-in-minikube-or-kind)
 - [CI/CD and local testing](#cicd-and-local-testing)
@@ -38,13 +38,13 @@ The same services can run locally with Docker Compose or be deployed to Kubernet
     - [`k8s/bootstrapping/`](k8s/bootstrapping/) — scripts to install configured Helm charts, bootstrap Sealed Secrets and create the encrypted manifest, plus image build-and-load helpers for Minikube and kind.
     - `k8s/tests/` — tests to exercise the application in a deployed Kubernetes cluster.
 - `docs/` — project notes and architecture decision records.
-    - See [`docs/architecture_decision_records/`](docs/architecture_decision_records/) for decisions about Redis, PostgreSQL, secrets, Kustomize, and staged deployment
+    - See [`docs/architecture_decision_records/`](docs/architecture_decision_records/) for the rational behind architecturale decisions taken when building this repo
     - See [`docs/engineering_notes/`](docs/engineering_notes/) for further engineering notes on implementation and operational topics that do not have an architectural impact.
-    - See [`docs/debugging_note.md`](docs/debugging_note.md) for an overview of how errors encountered during development were investigated and addressed.
+    - See [`docs/debugging_note.md`](docs/debugging_note.md) for an overview of how problems during development addressed.
     - See `docs/guides/` for guides and deep dives about certain aspects of the repository, including:
-        - [`docs/guides/secret-bootstrap-flow.md`](docs/guides/secret-bootstrap-flow.md) — describes in detail how thet bootstraping of a Sealed Secrets works
-        - [`docs/guides/local-testing.md`](docs/guides/local-testing.md) — describes how to run unit tests, Docker-based integration tests, and Kubernetes cluster tests.
-        - [`docs/guides/kubernetes-monitoring.md`](docs/guides/kubernetes-monitoring.md) — describes the Kubernetes monitoring stack and Grafana dashboards.
+        - [`docs/guides/secret-bootstrap-flow.md`](docs/guides/secret-bootstrap-flow.md) — Describes in detail how the bootstrapping process for on-premise deployment with Sealed Secrets works
+        - [`docs/guides/local-testing.md`](docs/guides/local-testing.md) — Describes how to run local testing
+        - [`docs/guides/kubernetes-monitoring.md`](docs/guides/kubernetes-monitoring.md) — Describes the Kubernetes monitoring stack and Grafana dashboards.
 
 ## Sending TradingView webhook alerts
 
@@ -63,10 +63,10 @@ Send an HTTP `POST` request to `/webhook/tradingview` with a JSON body. The `sec
 
 In TradingView, configure the alert message as this JSON and use the webhook URL for the running API. Supported action examples include `long`, `short`, and `close`.
 
-TradingView requires a publicly reachable HTTPS webhook URL, `localhost` and private cluster services won't work. For Kubernetes, an Ingress needs a running Ingress controller and an externally reachable IP or load balancer, plus DNS and TLS configuration. The Ingress resource alone does not provide internet access. For local testing, use a secure tunnel such as Cloudflare Tunnel or ngrok. Keep `WEBHOOK_SECRET` private.
+TradingView requires a publicly reachable HTTPS webhook URL; `localhost` and private cluster services will not work. The on-premise overlay configures HTTPS for the placeholder host `alerts.example.invalid` and redirects HTTP requests to HTTPS. It uses a local certificate authority, so it is suitable only for local testing after you trust that authority on the calling machine. For the required local hostname mapping, certificate trust steps, and the later public DNS/ACME setup, see [the HTTPS webhook guide](docs/guides/https-webhook.md). Keep `WEBHOOK_SECRET` private.
 
 
-## Running locally
+## Running the application stack locally
 ### Docker Compose
 
 Docker Compose starts the API, worker, fetcher, Redis, and PostgreSQL. Locally, the fetcher runs on a five-minute scheduler:
@@ -86,15 +86,15 @@ Before applying the Kubernetes manifests, build and load the application images 
 
 ```bash
 # Minikube
-# to see commandline options run
-# python k8s/bootstrapping/minikube_kind/minikube_build_and_load_images.py --help
+
+# to see commandline options add --help to the script call
 python k8s/bootstrapping/minikube_kind/minikube_build_and_load_images.py
 ```
 or 
 ```bash
 # kind
-# to see commandline options run
-# python k8s/bootstrapping/minikube_kind/kind_build_and_load_images.py --help
+
+# to see commandline options add --help to the script call
 python k8s/bootstrapping/minikube_kind/kind_build_and_load_images.py
 ```
 

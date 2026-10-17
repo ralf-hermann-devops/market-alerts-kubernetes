@@ -18,8 +18,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 CPU_LOAD_SECONDS = float(os.getenv("WORKER_CPU_LOAD_SECONDS", "0"))
+PENDING_MIN_IDLE_MS = 10_000
+MESSAGE_BATCH_SIZE = 10
 if not math.isfinite(CPU_LOAD_SECONDS) or CPU_LOAD_SECONDS < 0:
     raise ValueError("WORKER_CPU_LOAD_SECONDS must be a finite, non-negative number or not set at all.")
+
+
+class InvalidMessageError(ValueError):
+    """Raised when a Redis stream entry cannot be used as an alert."""
+
 
 """
 If WORKER_CPU_LOAD_SECONDS exceeds the pods termination grace period, 
@@ -39,16 +46,152 @@ def simulate_cpu_load(duration_seconds: float) -> None:
     while time.monotonic() < deadline:
         value = (value * 6364136223846793005 + 1) & 0xFFFFFFFFFFFFFFFF  # keep number in 64 bit boundries to not consume too much memory
 
+
+def parse_alert(fields: dict[str, Any]) -> dict[str, Any]:
+    try:
+        payload = fields["payload"]
+    except KeyError as error:
+        raise InvalidMessageError("missing payload field") from error
+
+    try:
+        alert = json.loads(payload)
+    except (ValueError, TypeError) as error:
+        raise InvalidMessageError("payload is not valid JSON") from error
+
+    if not isinstance(alert, dict):
+        raise InvalidMessageError("payload must be a JSON object")
+    if not isinstance(alert.get("symbol"), str):
+        raise InvalidMessageError("symbol must be a string")
+    if "\x00" in alert["symbol"]:
+        raise InvalidMessageError("symbol must not contain NUL characters")
+    if not isinstance(alert.get("action"), str):
+        raise InvalidMessageError("action must be a string")
+    if "\x00" in alert["action"]:
+        raise InvalidMessageError("action must not contain NUL characters")
+    if alert.get("price") is not None and (
+        isinstance(alert["price"], bool) or not isinstance(alert["price"], (int, float))):
+        raise InvalidMessageError("price must be a number or null")
+    if isinstance(alert.get("price"), float) and not math.isfinite(alert["price"]):
+        raise InvalidMessageError("price must be finite")
+    if alert.get("timeframe") is not None and not isinstance(alert["timeframe"], str):
+        raise InvalidMessageError("timeframe must be a string or null")
+    if alert.get("timeframe") is not None and "\x00" in alert["timeframe"]:
+        raise InvalidMessageError("timeframe must not contain NUL characters")
+
+    return alert
+
+
+def handle_invalid_message(
+    msg_id: str,
+    fields: dict[str, Any],
+    error: InvalidMessageError,
+) -> None:
+    logger.error(
+        "Invalid alert stream_id=%s fields=%s: %s",
+        msg_id,
+        sorted(fields),
+        error,
+    )
+
+
+def process_message(
+    r: Any,
+    db: Any,
+    stream_name: str,
+    group: str,
+    msg_id: str,
+    fields: dict[str, Any],
+) -> None:
+    try:
+        alert = parse_alert(fields)
+    except InvalidMessageError as error:
+        handle_invalid_message(msg_id, fields, error)
+        r.xack(stream_name, group, msg_id)
+        return
+
+    logger.info("Processing alert stream_id=%s symbol=%s action=%s",
+                msg_id, alert["symbol"], alert["action"])
+
+    simulate_cpu_load(CPU_LOAD_SECONDS)
+
+    try:
+        db.execute(
+            "INSERT INTO alerts (stream_id, symbol, action, price, timeframe) "
+            "VALUES (%s,%s,%s,%s,%s) ON CONFLICT (stream_id) DO NOTHING",
+            (
+                msg_id,
+                alert["symbol"],
+                alert["action"],
+                alert.get("price"),
+                alert.get("timeframe"),
+            ),
+        )
+        db.commit()
+    except psycopg.Error:
+        db.rollback()
+        raise
+
+    r.xack(stream_name, group, msg_id)
+    logger.info("Processed and acknowledged alert "
+        "stream_id=%s symbol=%s action=%s price=%s timeframe=%s",
+        msg_id, alert["symbol"], alert["action"],
+        alert.get("price"), alert.get("timeframe"))
+
+
+def read_messages(
+    r: Any,
+    stream_name: str,
+    group: str,
+    consumer: str,
+    pending_cursor: str,
+    read_pending: bool,
+) -> tuple[list[tuple[str, dict[str, Any]]], str, bool]:
+    """Alternate bounded pending claims with reads of new stream entries.
+
+    ``pending_cursor`` tracks progress through the pending-entry list. While it is
+    nonzero, the new-entry read blocks for only 1 ms so the worker quickly resumes
+    scanning pending entries; Value is 1 because Redis treats ``BLOCK 0`` as an indefinite wait.
+    Once the cursor reaches ``0-0``, the pending scan is complete, so the new-entry
+    read can wait up to 5 seconds for work before beginning another pending scan.
+    """
+    if read_pending:
+        next_cursor, pending_messages, _ = r.xautoclaim(
+            stream_name,
+            group,
+            consumer,
+            min_idle_time=PENDING_MIN_IDLE_MS,
+            start_id=pending_cursor,
+            count=MESSAGE_BATCH_SIZE,
+        )
+        return pending_messages, next_cursor, False
+
+    stream_messages = cast(
+        list[Any],
+        r.xreadgroup(
+            group,
+            consumer,
+            {stream_name: ">"},
+            count=MESSAGE_BATCH_SIZE,
+            block=1 if pending_cursor != "0-0" else 5000,
+        ) or [],
+    )
+    messages = [message for _, entries in stream_messages for message in entries]
+    return messages, pending_cursor, True
+
+
 def main():
     """Consume new Redis Stream alerts and persist them to PostgreSQL.
 
     Read connection settings from the environment and use the hostname as the
     consumer name. Ignore duplicate stream IDs on insertion and acknowledge each
-    message only after committing it. Pending messages are not reclaimed.
+    message only after committing it. Alternate batches of pending and unread
+    messages, reclaiming pending entries after 10 seconds of inactivity.
 
-    Suppress Redis ResponseError during group creation. Configuration, connection,
-    and message processing errors otherwise propagate, stopping the worker.
+    Suppress Redis ResponseError during group creation. Invalid alert messages are
+    logged and acknowledged without a database write. Configuration, connection,
+    and other processing errors otherwise propagate, stopping the worker.
     """
+
     # Listen for a SIGTERM signal and shutdown gracefully in case of one being set
     running = True
     signal.signal(signal.SIGTERM, lambda *_: locals().update(running=False))
@@ -81,31 +224,26 @@ def main():
             host=os.environ["POSTGRES_HOST"],
             port=os.environ["POSTGRES_PORT"]) as db:
         logger.info("Connected to PostgreSQL; waiting for alerts")
+        pending_cursor = "0-0"
+        read_pending = True
         while running:
-            stream_messages = cast(list[Any], r.xreadgroup(group, consumer, {stream_name: ">"}, count=10, block=5000) or [])
-            for _, msgs in stream_messages:
-                for msg_id, fields in msgs:
-                    try:
-                        a = json.loads(fields["payload"])
-                        logger.info("Processing alert stream_id=%s symbol=%s action=%s",
-                            msg_id, a.get("symbol", "unknown"), a.get("action", "unknown"))
+            msgs, pending_cursor, read_pending = read_messages(
+                r, stream_name, group, consumer, pending_cursor, read_pending
+            )
 
-                        
-                        simulate_cpu_load(CPU_LOAD_SECONDS)
-
-                        db.execute(
-                            "INSERT INTO alerts (stream_id, symbol, action, price, timeframe) "
-                            "VALUES (%s,%s,%s,%s,%s) ON CONFLICT (stream_id) DO NOTHING",
-                            (msg_id, a["symbol"], a["action"], a.get("price"), a.get("timeframe")))
-                        db.commit()
-                        r.xack(stream_name, group, msg_id)      # ack only after the DB commit
-
-                    except Exception:
-                        logger.exception("Failed processing alert stream_id=%s", msg_id)
-                        raise
-                    logger.info("Processed and acknowledged alert " \
-                                "stream_id=%s symbol=%s action=%s price=%s timeframe=%s",
-                            msg_id, a["symbol"], a["action"], a.get("price"), a.get("timeframe"))
+            for msg_id, fields in msgs:
+                try:
+                    process_message(r, db, stream_name, group, msg_id, fields)
+                except Exception:
+                    payload = fields.get("payload")
+                    payload_length = len(payload) if isinstance(payload, str) else None
+                    logger.exception(
+                        "Unexpected error processing alert stream_id=%s "
+                        "field_names=%s payload_length=%s",
+                        msg_id,
+                        sorted(fields),
+                        payload_length)
+                    raise
 
     logger.info("Worker shut down")
 

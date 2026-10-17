@@ -3,10 +3,36 @@ kind: Ingress
 metadata:
   name: api
   namespace: trading-alerts
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
 spec:
-  ingressClassName: nginx
+  # Standard NGINX Ingress controller was retired in March 2026
+  ingressClassName: traefik
   rules:
-    - host: alerts.local
+    - host: alerts.example.invalid
+      http:
+        paths:
+          - path: /webhook/tradingview
+            pathType: Exact
+            backend:
+              service:
+                name: api
+                port:
+                  name: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-http-redirect
+  namespace: trading-alerts
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.middlewares: trading-alerts-api-https-redirect@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: alerts.example.invalid
       http:
         paths:
           - path: /webhook/tradingview

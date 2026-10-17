@@ -187,3 +187,14 @@ trivy image --ignore-unfixed --severity HIGH,CRITICAL --exit-code 1 --skip-files
 ```
 
 The Kubernetes manifest and cluster checks are covered in the sections below. For details about CI's individual and assembled-manifest kubeconform scans, see the [Kubernetes manifest validation note](../engineering_notes/kubernetes-manifest-validation.md).
+
+To test the externally routed HTTPS path, including the Traefik Ingress, local
+CA certificate, TLS hostname, and webhook authentication, run:
+
+```bash
+python k8s/tests/smoke_tests/https_webhook/run.py
+```
+
+This temporarily forwards Traefik's HTTPS service port to localhost and sends
+the request with `alerts.example.invalid` as both the TLS server name and HTTP
+host. The port-forward is terminated when the test completes.

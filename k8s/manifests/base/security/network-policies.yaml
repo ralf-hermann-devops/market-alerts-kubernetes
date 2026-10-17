@@ -33,6 +33,7 @@ spec:
   policyTypes:
     - Ingress
   ingress:
+    # Allow ingress from API, worker, and KEDA operator pods to talk to redis
     - from:
         - podSelector:
             matchLabels:
@@ -49,6 +50,8 @@ spec:
       ports:
         - protocol: TCP
           port: 6379
+    # Allow ingress from Prometheus pods in the monitoring namespace
+    # to talk to the sidecar and scrap metrics
     - from:
         - namespaceSelector:
             matchLabels:

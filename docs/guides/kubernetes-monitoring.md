@@ -49,6 +49,14 @@ histogram_quantile(
 ```
 The Redis pod's exporter sidecar reports consumer-group lag, pending entries, and the age of the oldest outstanding message independently of worker processing. This prevents slow worker processing from delaying the Redis metrics refresh. Verify the `redis-metrics` target is **UP** on Prometheus's Targets page.
 
+To inspect the Redis Stream consumer-group counts directly, run:
+
+```bash
+kubectl exec -n trading-alerts deployment/redis -c redis -- sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --json XINFO GROUPS alerts'
+```
+
+In the `workers` group, `lag` is the unread count and `pending` is the number of messages delivered to consumers but not yet acknowledged. Redis may report `lag` as `null` when it cannot calculate the value.
+
 
 ## Cluster overview with headlamp
 
